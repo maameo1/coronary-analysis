@@ -1,0 +1,9 @@
+torch>=1.13
+monai>=0.9
+scikit-image>=0.19
+scipy>=1.8
+nibabel>=3.2
+lighter-zoo
+numpy
+matplotlib
+tqdm
