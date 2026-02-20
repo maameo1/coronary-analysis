@@ -23,7 +23,6 @@ code_release/
 │   ├── ctfm_l0_baseline.py           # L₀: DiceCE baseline
 │   ├── ctfm_l1_vesselness.py         # L₁: DiceCE + vesselness
 │   ├── ctfm_l2_cldice.py             # L₂: DiceCE + clDice
-│   ├── ctfm_l4_soft_bcs.py           # L₄: DiceCE + Soft BCS (standalone)
 │   ├── ctfm_l4_finetune_from_l1.py   # L_s: Fine-tune L₁ with Soft BCS (§3.3, Table 1)
 │   ├── nnunet_custom_trainers.py     # nnU-Net L₀/L₁/L₂ trainers
 │   └── precompute_stub_labels.py     # Precompute bifurcation stub labels
@@ -48,7 +47,7 @@ code_release/
 pip install torch monai scikit-image scipy nibabel lighter-zoo tqdm matplotlib
 ```
 
-- **Dataset**: [ImageCAS](https://github.com/XiaoweiXu/ImageCAS) (1000 CTCA volumes)
+- **Dataset**: [ImageCAS](https://github.com/XiaoweiXu/ImageCAS-A-Large-Scale-Dataset-and-Benchmark-for-Coronary-Artery-Segmentation-based-on-CT) (1000 CTCA volumes)
 - **CT-FM weights**: Auto-downloaded from HuggingFace (`project-lighter/ct_fm_segresnet`)
 
 ### Step 1: Data Preparation
