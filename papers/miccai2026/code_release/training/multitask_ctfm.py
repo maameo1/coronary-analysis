@@ -845,7 +845,7 @@ def main():
     print(f"   - CT-FM alone: +7.1% over baseline")
     print(f"   - Multi-Task alone: +1.3% over baseline")
     print(f"   - Combined: ???")
-    print(f"\n⚖️  Loss weights:")
+    print(f"\n  Loss weights:")
     print(f"   - Segmentation: {config.seg_loss_weight}")
     print(f"   - Vesselness (λ): {config.vessel_loss_weight}")
     
@@ -912,7 +912,7 @@ def main():
     ).to(config.device)
     
     # Verify model works before training
-    print("\n🔍 Verifying model architecture...")
+    print("\n Verifying model architecture...")
     with torch.no_grad():
         test_input = torch.randn(1, 1, 96, 96, 96).to(config.device)
         test_seg, test_vessel = model(test_input)
@@ -1004,7 +1004,7 @@ def main():
                     }
                 }, config.output_root / "checkpoints" / "best_model.pth")
                 
-                print(f"⭐ New best model! Dice: {best_dice:.4f}")
+                print(f" New best model! Dice: {best_dice:.4f}")
                 
                 # Save visualization for best model
                 if config.save_gradcam:
@@ -1016,7 +1016,7 @@ def main():
                 patience_counter += 1
             
             if patience_counter >= config.early_stopping_patience:
-                print(f"\n⏹  Early stopping at epoch {epoch+1}")
+                print(f"\n  Early stopping at epoch {epoch+1}")
                 break
     
     # Save final model
