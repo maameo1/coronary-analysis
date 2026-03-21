@@ -1,0 +1,390 @@
+{
+  "description": "Decoder-level linear probing for bifurcation detection",
+  "decoder_levels": {
+    "0": {
+      "channels": 256,
+      "spatial": 12,
+      "desc": "256ch, 12\u00b3 (deep decoder)"
+    },
+    "1": {
+      "channels": 128,
+      "spatial": 24,
+      "desc": "128ch, 24\u00b3"
+    },
+    "2": {
+      "channels": 64,
+      "spatial": 48,
+      "desc": "64ch, 48\u00b3"
+    },
+    "3": {
+      "channels": 32,
+      "spatial": 96,
+      "desc": "32ch, 96\u00b3 (final decoder)"
+    }
+  },
+  "n_train_cases": 30,
+  "n_val_cases": 20,
+  "date": "2026-03-09T16:14:51.309089",
+  "results": {
+    "L1 (vesselness)": {
+      "dec_level_0": {
+        "accuracy": 0.6089371980676328,
+        "balanced_accuracy": 0.6089371980676328,
+        "auc": 0.6699948656911481,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_1": {
+        "accuracy": 0.657487922705314,
+        "balanced_accuracy": 0.6574879227053141,
+        "auc": 0.7095869215150878,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_2": {
+        "accuracy": 0.6987922705314009,
+        "balanced_accuracy": 0.6987922705314009,
+        "auc": 0.7600722303904409,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_3": {
+        "accuracy": 0.658695652173913,
+        "balanced_accuracy": 0.6586956521739131,
+        "auc": 0.7048022124203599,
+        "n_train": 6580,
+        "n_val": 4140
+      }
+    },
+    "EXP-044 (frozen, w=0.03)": {
+      "dec_level_0": {
+        "accuracy": 0.6123188405797102,
+        "balanced_accuracy": 0.6123188405797102,
+        "auc": 0.6632608695652173,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_1": {
+        "accuracy": 0.6516908212560386,
+        "balanced_accuracy": 0.6516908212560386,
+        "auc": 0.7075446334803612,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_2": {
+        "accuracy": 0.7007246376811594,
+        "balanced_accuracy": 0.7007246376811594,
+        "auc": 0.7576152302270766,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_3": {
+        "accuracy": 0.6519323671497584,
+        "balanced_accuracy": 0.6519323671497584,
+        "auc": 0.6910628019323671,
+        "n_train": 6580,
+        "n_val": 4140
+      }
+    },
+    "EXP-048 (frozen, w=0.05)": {
+      "dec_level_0": {
+        "accuracy": 0.621256038647343,
+        "balanced_accuracy": 0.6212560386473429,
+        "auc": 0.6666069219818432,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_1": {
+        "accuracy": 0.6492753623188405,
+        "balanced_accuracy": 0.6492753623188405,
+        "auc": 0.7098438703353638,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_2": {
+        "accuracy": 0.6908212560386473,
+        "balanced_accuracy": 0.6908212560386473,
+        "auc": 0.7562303671030829,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_3": {
+        "accuracy": 0.6502415458937199,
+        "balanced_accuracy": 0.6502415458937199,
+        "auc": 0.6896065252397956,
+        "n_train": 6580,
+        "n_val": 4140
+      }
+    },
+    "EXP-046 (frozen, w=0.10)": {
+      "dec_level_0": {
+        "accuracy": 0.607487922705314,
+        "balanced_accuracy": 0.607487922705314,
+        "auc": 0.6647332493173702,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_1": {
+        "accuracy": 0.6577294685990338,
+        "balanced_accuracy": 0.6577294685990338,
+        "auc": 0.7070861630376438,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_2": {
+        "accuracy": 0.6973429951690822,
+        "balanced_accuracy": 0.6973429951690822,
+        "auc": 0.7569272328409063,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_3": {
+        "accuracy": 0.6582125603864735,
+        "balanced_accuracy": 0.6582125603864735,
+        "auc": 0.693421783472193,
+        "n_train": 6580,
+        "n_val": 4140
+      }
+    },
+    "EXP-049 (partial, w=0.03)": {
+      "dec_level_0": {
+        "accuracy": 0.6195652173913043,
+        "balanced_accuracy": 0.6195652173913043,
+        "auc": 0.6742124670354035,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_1": {
+        "accuracy": 0.659903381642512,
+        "balanced_accuracy": 0.6599033816425122,
+        "auc": 0.7065306074820883,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_2": {
+        "accuracy": 0.6828502415458937,
+        "balanced_accuracy": 0.6828502415458937,
+        "auc": 0.7506855469205815,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_3": {
+        "accuracy": 0.6538647342995169,
+        "balanced_accuracy": 0.653864734299517,
+        "auc": 0.6904095778197858,
+        "n_train": 6580,
+        "n_val": 4140
+      }
+    },
+    "EXP-047 (partial, w=0.05)": {
+      "dec_level_0": {
+        "accuracy": 0.6285024154589371,
+        "balanced_accuracy": 0.6285024154589371,
+        "auc": 0.6694701159887045,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_1": {
+        "accuracy": 0.65,
+        "balanced_accuracy": 0.6499999999999999,
+        "auc": 0.7079325071763635,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_2": {
+        "accuracy": 0.6864734299516908,
+        "balanced_accuracy": 0.6864734299516908,
+        "auc": 0.7495340614716797,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_3": {
+        "accuracy": 0.6442028985507247,
+        "balanced_accuracy": 0.6442028985507247,
+        "auc": 0.6919972461434339,
+        "n_train": 6580,
+        "n_val": 4140
+      }
+    },
+    "EXP-050 (partial, w=0.10)": {
+      "dec_level_0": {
+        "accuracy": 0.6272946859903382,
+        "balanced_accuracy": 0.6272946859903381,
+        "auc": 0.6847971948003455,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_1": {
+        "accuracy": 0.6591787439613527,
+        "balanced_accuracy": 0.6591787439613527,
+        "auc": 0.7106616257088847,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_2": {
+        "accuracy": 0.6801932367149759,
+        "balanced_accuracy": 0.6801932367149759,
+        "auc": 0.7489725547854091,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_3": {
+        "accuracy": 0.6396135265700483,
+        "balanced_accuracy": 0.6396135265700482,
+        "auc": 0.6863749445728022,
+        "n_train": 6580,
+        "n_val": 4140
+      }
+    },
+    "EXP-052 (BitFit, w=0.05)": {
+      "dec_level_0": {
+        "accuracy": 0.6256038647342995,
+        "balanced_accuracy": 0.6256038647342995,
+        "auc": 0.6689897080445285,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_1": {
+        "accuracy": 0.6531400966183575,
+        "balanced_accuracy": 0.6531400966183575,
+        "auc": 0.7123498798104974,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_2": {
+        "accuracy": 0.6920289855072463,
+        "balanced_accuracy": 0.6920289855072463,
+        "auc": 0.7583781418469508,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_3": {
+        "accuracy": 0.6509661835748792,
+        "balanced_accuracy": 0.6509661835748792,
+        "auc": 0.6897904268477677,
+        "n_train": 6580,
+        "n_val": 4140
+      }
+    },
+    "EXP-053 (adapter, w=0.05)": {
+      "dec_level_0": {
+        "accuracy": 0.6256038647342995,
+        "balanced_accuracy": 0.6256038647342995,
+        "auc": 0.6759570818455507,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_1": {
+        "accuracy": 0.6521739130434783,
+        "balanced_accuracy": 0.6521739130434783,
+        "auc": 0.7082671707624448,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_2": {
+        "accuracy": 0.6922705314009662,
+        "balanced_accuracy": 0.6922705314009662,
+        "auc": 0.7545054727064809,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_3": {
+        "accuracy": 0.6565217391304348,
+        "balanced_accuracy": 0.6565217391304348,
+        "auc": 0.6943291558729492,
+        "n_train": 6580,
+        "n_val": 4140
+      }
+    },
+    "EXP-045 (full, w=0.10)": {
+      "dec_level_0": {
+        "accuracy": 0.6388888888888888,
+        "balanced_accuracy": 0.6388888888888888,
+        "auc": 0.6756581250437583,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_1": {
+        "accuracy": 0.7033816425120772,
+        "balanced_accuracy": 0.7033816425120774,
+        "auc": 0.7655012952460967,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_2": {
+        "accuracy": 0.6990338164251207,
+        "balanced_accuracy": 0.6990338164251209,
+        "auc": 0.7535087166561647,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_3": {
+        "accuracy": 0.6229468599033816,
+        "balanced_accuracy": 0.6229468599033816,
+        "auc": 0.6645665009685173,
+        "n_train": 6580,
+        "n_val": 4140
+      }
+    },
+    "Full+clDice (w=0.10, LR=1e-5)": {
+      "dec_level_0": {
+        "accuracy": 0.6248792270531401,
+        "balanced_accuracy": 0.62487922705314,
+        "auc": 0.6850542603094587,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_1": {
+        "accuracy": 0.6806763285024154,
+        "balanced_accuracy": 0.6806763285024156,
+        "auc": 0.7387259912716749,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_2": {
+        "accuracy": 0.6903381642512078,
+        "balanced_accuracy": 0.6903381642512078,
+        "auc": 0.7604486685803635,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_3": {
+        "accuracy": 0.6451690821256039,
+        "balanced_accuracy": 0.6451690821256039,
+        "auc": 0.6934266844033701,
+        "n_train": 6580,
+        "n_val": 4140
+      }
+    },
+    "Full+BCS matched (w=0.10, LR=1e-5)": {
+      "dec_level_0": {
+        "accuracy": 0.6352657004830918,
+        "balanced_accuracy": 0.6352657004830917,
+        "auc": 0.6920523232747555,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_1": {
+        "accuracy": 0.6705314009661836,
+        "balanced_accuracy": 0.6705314009661836,
+        "auc": 0.7259378281873556,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_2": {
+        "accuracy": 0.6816425120772946,
+        "balanced_accuracy": 0.6816425120772946,
+        "auc": 0.7553822726318,
+        "n_train": 6580,
+        "n_val": 4140
+      },
+      "dec_level_3": {
+        "accuracy": 0.6570048309178744,
+        "balanced_accuracy": 0.6570048309178744,
+        "auc": 0.6979227053140097,
+        "n_train": 6580,
+        "n_val": 4140
+      }
+    }
+  }
+}

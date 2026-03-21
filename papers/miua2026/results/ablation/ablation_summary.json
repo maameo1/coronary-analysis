@@ -1,0 +1,188 @@
+{
+  "description": "MIUA 2026 Ablation: Encoder Adaptation × BCS Weight",
+  "base_model": "CT-FM SegResNet (L1 vesselness, 638 train cases)",
+  "test_set": "ImageCAS fold 1, n=250",
+  "date": "2026-02-18",
+  "experiments": {
+    "L1_baseline": {
+      "experiment": "EXP-028 (L1 vesselness)",
+      "encoder": "fully trained (no BCS)",
+      "bcs_weight": 0.0,
+      "trainable_params": "87.8M (all)",
+      "status": "COMPLETE (n=250)",
+      "metrics": {
+        "dice": {"mean": 0.790, "std": 0.045},
+        "cldice": {"mean": 0.867, "std": 0.051},
+        "bcs": {"mean": 0.690, "std": 0.159},
+        "hd95": {"mean": 10.5, "std": 9.3},
+        "betti_error": {"mean": 4.70, "std": 2.86}
+      },
+      "source": "test_results/Archive/bcs_results_ctfm_l1_638.json"
+    },
+    "EXP-044_frozen_w003": {
+      "experiment": "EXP-044",
+      "encoder": "frozen (decoder-only fine-tune from L1)",
+      "bcs_weight": 0.03,
+      "trainable_params": "10.0M (decoder only)",
+      "status": "COMPLETE (n=250)",
+      "metrics": {
+        "dice": {"mean": 0.792, "std": 0.046},
+        "cldice": {"mean": 0.857, "std": 0.055},
+        "bcs": {"mean": 0.716, "std": 0.149},
+        "hd95": {"mean": 8.72, "std": 9.22},
+        "betti_error": {"mean": 9.44}
+      },
+      "source": "experiments/EXP-044_.../test_predictions_configB/l4_test_metrics.json"
+    },
+    "EXP-048_frozen_w005": {
+      "experiment": "EXP-048",
+      "encoder": "frozen (decoder-only fine-tune from L1)",
+      "bcs_weight": 0.05,
+      "trainable_params": "10.0M (decoder only)",
+      "status": "COMPLETE (n=250)",
+      "metrics": {
+        "dice": {"mean": 0.792, "std": 0.046},
+        "cldice": {"mean": 0.856, "std": 0.056},
+        "bcs": {"mean": 0.722, "std": 0.148},
+        "hd95": {"mean": 8.82, "std": 9.41},
+        "betti_error": {"mean": 9.11}
+      },
+      "source": "experiments/EXP-048_ctfm_l4_frozen_w005_20260216_183415/test_predictions_configB/l4_test_metrics.json"
+    },
+    "EXP-046_frozen_w010": {
+      "experiment": "EXP-046",
+      "encoder": "frozen (decoder-only fine-tune from L1)",
+      "bcs_weight": 0.10,
+      "trainable_params": "10.0M (decoder only)",
+      "status": "COMPLETE (n=250)",
+      "metrics": {
+        "dice": {"mean": 0.785, "std": 0.048},
+        "cldice": {"mean": 0.844, "std": 0.060},
+        "bcs": {"mean": 0.730, "std": 0.146},
+        "hd95": {"mean": 10.20, "std": 10.37},
+        "betti_error": {"mean": 13.20}
+      },
+      "source": "experiments/EXP-046_.../test_predictions_configB/l4_test_metrics.json"
+    },
+    "EXP-049_partial_w003": {
+      "experiment": "EXP-049",
+      "encoder": "partial unfreeze (last encoder block + decoder)",
+      "bcs_weight": 0.03,
+      "trainable_params": "27.7M (last block + decoder)",
+      "status": "COMPLETE (n=250)",
+      "metrics": {
+        "dice": {"mean": 0.793, "std": 0.046},
+        "cldice": {"mean": 0.858, "std": 0.054},
+        "bcs": {"mean": 0.715, "std": 0.151},
+        "hd95": {"mean": 9.38, "std": 10.65},
+        "betti_error": {"mean": 8.44}
+      },
+      "source": "experiments/EXP-049_ctfm_l4_partial_w003_20260217_091451/test_predictions_configB/l4_test_metrics.json"
+    },
+    "EXP-047_partial_w005": {
+      "experiment": "EXP-047",
+      "encoder": "partial unfreeze (last encoder block + decoder)",
+      "bcs_weight": 0.05,
+      "trainable_params": "27.7M (last block + decoder)",
+      "status": "COMPLETE (n=250)",
+      "metrics": {
+        "dice": {"mean": 0.792, "std": 0.047},
+        "cldice": {"mean": 0.861, "std": 0.054},
+        "bcs": {"mean": 0.724, "std": 0.146},
+        "hd95": {"mean": 8.39, "std": 9.12},
+        "betti_error": {"mean": 8.13}
+      },
+      "source": "experiments/EXP-047_.../test_predictions_configB/l4_test_metrics.json"
+    },
+    "EXP-050_partial_w010": {
+      "experiment": "EXP-050",
+      "encoder": "partial unfreeze (last encoder block + decoder)",
+      "bcs_weight": 0.10,
+      "trainable_params": "27.7M (last block + decoder)",
+      "status": "COMPLETE (n=250)",
+      "metrics": {
+        "dice": {"mean": 0.789, "std": 0.046},
+        "cldice": {"mean": 0.858, "std": 0.054},
+        "bcs": {"mean": 0.714, "std": 0.153},
+        "hd95": {"mean": 8.47, "std": 9.07},
+        "betti_error": {"mean": 7.95}
+      },
+      "source": "experiments/EXP-050_ctfm_l4_partial_w010_20260217_165312/test_predictions_configB/l4_test_metrics.json"
+    },
+    "EXP-045_full_w010": {
+      "experiment": "EXP-045",
+      "encoder": "full (all parameters trainable from L1)",
+      "bcs_weight": 0.10,
+      "trainable_params": "87.8M (all)",
+      "status": "COMPLETE (n=250)",
+      "metrics": {
+        "dice": {"mean": 0.748, "std": 0.070},
+        "cldice": {"mean": 0.778, "std": 0.089},
+        "bcs": {"mean": 0.739, "std": 0.147},
+        "hd95": {"mean": 33.56, "std": 23.46},
+        "betti_error": {"mean": 19.85}
+      },
+      "source": "experiments/EXP-045_ctfm_l4_no_biased_crop_20260214_124914/test_predictions_configB/l4_test_metrics.json",
+      "note": "Full unfreeze overfits: val Dice 0.807 but test Dice 0.748 (6pp gap)"
+    },
+    "EXP-052_bitfit_w005": {
+      "experiment": "EXP-052",
+      "encoder": "BitFit (encoder norm params only)",
+      "bcs_weight": 0.05,
+      "trainable_params": "10.03M (14K encoder norm + 10M decoder)",
+      "status": "COMPLETE (n=250)",
+      "metrics": {
+        "dice": {"mean": 0.787, "std": 0.047},
+        "cldice": {"mean": 0.851, "std": 0.057},
+        "bcs": {"mean": 0.720, "std": 0.147},
+        "hd95": {"mean": 9.47, "std": 9.91},
+        "betti_error": {"mean": 10.93}
+      },
+      "source": "experiments/EXP-052_ctfm_l4_bitfit_20260221_101005/test_predictions_configB/l4_test_metrics.json"
+    },
+    "EXP-053_adapter_w005": {
+      "experiment": "EXP-053",
+      "encoder": "Skip adapters (frozen encoder + bottleneck adapters at skips)",
+      "bcs_weight": 0.05,
+      "trainable_params": "10.19M (175K adapters + 10M decoder)",
+      "status": "COMPLETE (n=250)",
+      "metrics": {
+        "dice": {"mean": 0.781, "std": 0.049},
+        "cldice": {"mean": 0.840, "std": 0.060},
+        "bcs": {"mean": 0.715, "std": 0.158},
+        "hd95": {"mean": 13.56, "std": 14.40},
+        "betti_error": {"mean": 14.44}
+      },
+      "source": "experiments/EXP-053_ctfm_l4_adapter_20260221_174141/test_predictions_configB/l4_test_metrics.json"
+    }
+  },
+  "ablation_grid": {
+    "note": "5×3 grid: adaptation_level × bcs_weight. Full row has only w=0.10 (EXP-045, overfitting confirmed).",
+    "rows": [
+      "BitFit (norm only, ~14K enc params)",
+      "adapters (skip, ~175K adapter params)",
+      "frozen (decoder-only, 0 enc params)",
+      "partial (last encoder block, 17.7M enc params)",
+      "full (all params, 77.8M enc params)"
+    ],
+    "columns": ["w=0.03", "w=0.05", "w=0.10"],
+    "cells": {
+      "bitfit_w005": "EXP-052 (training)",
+      "adapter_w005": "EXP-053 (training)",
+      "frozen_w003": "EXP-044",
+      "frozen_w005": "EXP-048",
+      "frozen_w010": "EXP-046",
+      "partial_w003": "EXP-049",
+      "partial_w005": "EXP-047",
+      "partial_w010": "EXP-050",
+      "full_w010": "EXP-045 (overfitting)"
+    }
+  },
+  "key_findings": {
+    "frozen_row": "Monotonic BCS increase with w (0.716→0.722→0.730), but Dice drops at w=0.10 (-0.7pp). Sweet spot at w=0.03-0.05.",
+    "partial_row": "Best all-round at w=0.05 (Dice 0.792, BCS 0.724, HD95 8.39). Diminishing returns at w=0.10.",
+    "full_row": "Catastrophic overfitting. Val Dice 0.807 but test Dice 0.748 (6pp gap). HD95 explodes to 33.6mm.",
+    "frozen_vs_partial": "Near-identical Dice (0.792 vs 0.792 at w=0.05). Partial gives slightly better BCS (+0.2pp) and much better HD95/Betti.",
+    "conclusion": "Decoder-only and partial adaptation preserve pretrained encoder features, avoiding overfitting while enabling topology learning."
+  }
+}

@@ -1,0 +1,445 @@
+\documentclass[runningheads]{llncs}
+
+% LNCS basic packages
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{placeins}
+
+% Convenience
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+
+\begin{document}
+
+\title{Topology-aware Low-shot Adaptation of CT Foundation Models\\for Coronary Artery Segmentation}
+\titlerunning{Topology-aware Low-shot Adaptation for Coronary Segmentation}
+
+\author{First Author\inst{1}\orcidID{0000-0000-0000-0000} \and
+Second Author\inst{1}\orcidID{0000-0000-0000-0000}}
+%
+\authorrunning{F. Author et al.}
+%
+\institute{University Name, City, Country \\
+    \email{\{first,second\}@university.ac.uk}}
+
+\maketitle
+
+%----------------------------------------------------------------------
+\begin{abstract}
+Foundation models for CT segmentation achieve strong volumetric overlap through large-scale pretraining, but their adaptation for topology-sensitive tasks such as coronary artery segmentation remains under-studied.
+We present a systematic study of how encoder adaptation strategy interacts with topology-aware supervision when fine-tuning CT-FM, a SegResNet foundation model pretrained on 148K CT scans.
+On ImageCAS ($n{=}250$ test), we cross five adaptation strategies---decoder-only, BitFit, skip adapters, partial unfreeze, and full fine-tuning---with three loss weights for a differentiable bifurcation connectedness (Soft BCS) surrogate, yielding an ablation grid of segmentation and topology metrics.
+Decoder-only fine-tuning achieves the best overlap--connectivity balance (Dice~0.793, BCS~0.716 at $\lambda_s{=}0.03$), while full fine-tuning catastrophically overfits (Dice drops 4.5\,pp, HD95 triples).
+Centered Kernel Alignment confirms that all parameter-efficient strategies preserve encoder representations (CKA${\geq}0.84$), localising adaptation to the decoder.
+We further evaluate cross-domain transfer to ASOCA, where annotation protocol mismatch (full-tree vs.\ major-vessel labels) causes systematic over-segmentation (Dice~0.48, BCS~0.79).
+Minimal low-shot adaptation ($k{=}1$) with shallow decoder fine-tuning and threshold calibration recovers Dice to 0.706 while preserving BCS at 0.752; adding more training data paradoxically degrades performance.
+\keywords{Coronary artery segmentation \and Foundation models \and Topology-aware learning \and Low-shot adaptation \and Encoder adaptation}
+\end{abstract}
+
+%----------------------------------------------------------------------
+\section{Introduction}
+
+Foundation models pretrained on large-scale CT data offer strong initialisation for downstream segmentation tasks, reducing the need for task-specific training from scratch~\cite{pai_ctfm_2025,huang_stu_2023}.
+In coronary artery segmentation, accurate delineation underpins stenosis quantification, FFR-CT estimation, and stent planning~\cite{lin_deep_2022}.
+However, two practical challenges limit straightforward deployment of pretrained models.
+
+First, \emph{how to adapt} the pretrained encoder is an open question.
+Full fine-tuning risks catastrophic forgetting of pretrained features, while freezing the encoder entirely may under-utilise its capacity.
+The transfer-learning literature in NLP and 2D vision has studied parameter-efficient strategies---BitFit~\cite{zaken_bitfit_2022}, adapters~\cite{houlsby_adapters_2019}, partial unfreezing~\cite{lee_surgical_2023}---but their interaction with \emph{topology-aware losses} in 3D medical imaging is unexplored.
+
+Second, \emph{annotation protocol mismatch} between source and target datasets creates a distribution shift in label space.
+A model pretrained on full coronary tree annotations (ImageCAS~\cite{zeng_imagecas_2023}) will systematically over-segment when applied to datasets labelling only major vessels (ASOCA~\cite{gharleghi_asoca_2022}).
+This is not domain shift in image appearance but a mismatch in the definition of the target structure.
+In the low-shot regime, where few labelled examples are available, topology-aware supervision may act as an inductive bias to constrain the solution space~\cite{shit_cldice_2021,hu_topology_2019,clough_topological_2022}.
+
+We address both challenges in a unified study.
+On ImageCAS ($n{=}638$ train, $n{=}250$ test), we systematically ablate five encoder adaptation strategies crossed with three topology loss weights, using the differentiable Soft BCS loss from our prior work~\cite{anonymous_bcs_2026}.
+We complement the ablation with representational analysis (CKA similarity~\cite{kornblith_cka_2019} and linear probing) to explain \emph{why} certain strategies succeed.
+We then evaluate cross-domain transfer to ASOCA under annotation protocol mismatch, testing whether the best adaptation strategy generalises and whether topology-aware supervision improves low-shot sample efficiency.
+
+\paragraph{Contributions.}
+\begin{enumerate}
+    \item A systematic ablation of five encoder adaptation strategies $\times$ three BCS loss weights, identifying decoder-only fine-tuning as optimal for topology-aware coronary artery segmentation.
+    \item Representational analysis (CKA, linear probing) showing that all parameter-efficient strategies preserve encoder features (CKA${\geq}0.84$), while full fine-tuning destroys them (CKA${\leq}0.37$ at the bottleneck).
+    \item Cross-domain evaluation on ASOCA demonstrating annotation protocol mismatch effects and the role of topology-aware supervision in low-shot adaptation.
+\end{enumerate}
+
+%----------------------------------------------------------------------
+\section{Related Work}
+
+\paragraph{Foundation model adaptation.}
+Large pretrained models can be adapted via full fine-tuning, linear probing, or parameter-efficient methods including BitFit (bias-only tuning)~\cite{zaken_bitfit_2022}, bottleneck adapters~\cite{houlsby_adapters_2019,chen_adaptformer_2022}, and surgical fine-tuning of selected layers~\cite{lee_surgical_2023}.
+Kumar et al.~\cite{kumar_finetuning_2022} showed that full fine-tuning can distort pretrained features and degrade out-of-distribution performance.
+In medical imaging, STU-Net~\cite{huang_stu_2023} and CT-FM~\cite{pai_ctfm_2025} demonstrate scalable pretraining, but downstream adaptation strategies remain under-explored, particularly for topology-sensitive losses.
+
+\paragraph{Topology-aware segmentation.}
+clDice~\cite{shit_cldice_2021} penalises centreline disconnections via soft skeletonisation.
+Persistent homology losses~\cite{clough_topological_2022,hu_topology_2019} target Betti numbers but are computationally expensive for 3D volumes.
+Roug\'e et al.~\cite{rouge_topology_2024} combine topology-aware cascaded U-Nets for cerebrovascular segmentation.
+Our prior work~\cite{anonymous_bcs_2026} introduced bifurcation connectedness score (BCS) and a differentiable Soft BCS loss that directly supervises branch-level connectivity.
+All prior topology work focuses on \emph{loss design}; none studies how the choice of \emph{adaptation strategy} interacts with topology-aware objectives.
+
+%----------------------------------------------------------------------
+\section{Methods}
+
+\subsection{Background: BCS and Soft BCS Loss}
+\label{sec:bcs}
+
+The bifurcation connectedness score (BCS)~\cite{anonymous_bcs_2026} evaluates whether predicted segmentations preserve connectivity at ground-truth bifurcation points.
+Given a ground-truth skeleton, bifurcation voxels (degree ${\geq}3$) are clustered into junctions.
+For each junction, branch stubs of length $l{=}8$ are traced along each outgoing branch.
+A junction is \emph{preserved} if all its stubs are mutually reachable through the predicted segmentation (dilated skeleton, tolerance $\tau{=}3$).
+BCS is the fraction of preserved junctions.
+
+The differentiable Soft BCS loss operates on precomputed ground-truth stub labels.
+Writing $p(v)$ for the predicted foreground probability at voxel $v$ and $\bar{p}_k = \frac{1}{|s_k|}\sum_{v \in s_k} p(v)$ for the mean probability on stub~$k$, the per-bifurcation loss uses a softmin weighting:
+\begin{equation}\label{eq:softbcs}
+\ell_c = 1 - \sum_k w_k \bar{p}_k, \quad
+w_k = \frac{\exp(-\bar{p}_k/T)}{\sum_j \exp(-\bar{p}_j/T)},
+\end{equation}
+where $T{=}0.1$ concentrates gradients on the least-connected branch.
+The total loss averages over all bifurcations in the training patch:
+$\mathcal{L}_{\mathrm{softBCS}} = \frac{1}{|\mathcal{C}'|}\sum_{c \in \mathcal{C}'} \ell_c$.
+
+\subsection{Base Model and Training Setup}
+
+We use CT-FM~\cite{pai_ctfm_2025}, a SegResNet~\cite{myronenko_segresnet_2019} encoder (${\sim}$78M parameters) pretrained on 148K CT scans via self-supervised learning.
+All experiments start from an ImageCAS-pretrained checkpoint that was fine-tuned with a multi-task loss combining DiceCE segmentation and Frangi vesselness prediction~\cite{frangi_multiscale_1998} (denoted $\mathcal{L}_v$, our ``L1'' baseline).
+The composite training loss is:
+\begin{equation}\label{eq:loss}
+\mathcal{L} = \mathcal{L}_v + \lambda_s \, \mathcal{L}_{\mathrm{softBCS}},
+\end{equation}
+where $\lambda_s$ controls the topology loss weight.
+Training uses ImageCAS~\cite{zeng_imagecas_2023} (638 train, 112 val, 250 test), $192^3$ patches with random pos/neg cropping, 30 epochs, and cosine-annealed learning rate.
+
+\subsection{Adaptation Strategies}
+\label{sec:strategies}
+
+We evaluate five strategies spanning a parameter-efficiency spectrum (Table~\ref{tab:strategies}).
+All start from the same L1 checkpoint, use identical data augmentation and training schedule, and differ only in which parameters are trainable.
+
+\begin{table}[t]
+\caption{Encoder adaptation strategies. All share the same 10M-parameter decoder.}
+\label{tab:strategies}
+\centering
+\small
+\begin{tabular}{llrr}
+\toprule
+Strategy & Encoder trainable params & Total trainable & LR \\
+\midrule
+Frozen (decoder-only)     & 0                        & 10.0M  & $10^{-5}$ \\
+BitFit (norm params)      & ${\sim}$14K (BN bias+scale) & 10.0M  & $10^{-5}$ \\
+Adapters (skip bottleneck)& ${\sim}$175K              & 10.2M  & $10^{-5}$ \\
+Partial (last enc.\ block) & 17.7M                   & 27.7M  & $5{\times}10^{-5}$ \\
+Full (all parameters)     & 77.8M                    & 87.8M  & $10^{-4}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Each strategy is crossed with $\lambda_s \in \{0.03, 0.05, 0.10\}$.
+BitFit and adapter experiments are run at $\lambda_s{=}0.05$ only; full fine-tuning at $\lambda_s{=}0.10$ only (it diverged at lower weights).
+This yields 11 experimental cells plus the L1 baseline ($\lambda_s{=}0$).
+
+\subsection{Representational Analysis}
+
+To understand \emph{why} certain strategies preserve performance, we measure how much the encoder changes during fine-tuning.
+
+\paragraph{CKA similarity~\cite{kornblith_cka_2019}.}
+We compute linear Centered Kernel Alignment between the L1 baseline encoder and each fine-tuned encoder at five resolution levels (32ch/96$^3$ to 512ch/6$^3$).
+CKA${\approx}1$ indicates preserved representations; low CKA indicates feature drift.
+
+\paragraph{Linear probing.}
+We train logistic regression classifiers on frozen encoder features to predict whether a voxel neighbourhood contains a bifurcation.
+Higher probe accuracy at a given level indicates that bifurcation-relevant information is linearly accessible there.
+We probe both encoder and decoder features.
+
+\subsection{Cross-Domain Transfer: ASOCA}
+\label{sec:asoca}
+
+ASOCA~\cite{gharleghi_asoca_2022} provides 40 CTCA scans (20 normal, 20 diseased) with major-vessel-only annotations, contrasting ImageCAS's full coronary tree labels.
+This annotation protocol mismatch means the pretrained model systematically includes side branches absent from ASOCA's ground truth.
+
+\paragraph{Zero-shot evaluation.}
+We apply all ImageCAS-trained models directly to ASOCA (threshold 0.5) to quantify the mismatch.
+
+\paragraph{Low-shot fine-tuning.}
+We fine-tune using $k \in \{1, 5, 10\}$ labelled ASOCA scans per group ($2k$ total), with topology-aware supervision ($\lambda_s{=}0.05$).
+The encoder and first two decoder levels are frozen, adapting only the last two decoder levels---motivated by the insight that the model needs to suppress side branches rather than learn new features.
+We sweep the binarisation threshold $t \in [0.3, 0.9]$ and report results at the optimal threshold per $k$.
+
+\subsection{Evaluation Metrics}
+
+We report Dice (volumetric overlap), clDice~\cite{shit_cldice_2021} (centreline overlap), BCS~\cite{anonymous_bcs_2026} (bifurcation connectedness, $\tau{=}3$, $l{=}8$), HD95 (95th-percentile Hausdorff distance, mm), and Betti$_0$ error ($|\beta_0(P) - \beta_0(G)|$, connected component mismatch).
+
+%----------------------------------------------------------------------
+\section{Results}
+
+\subsection{ImageCAS Ablation: Adaptation Strategy $\times$ BCS Weight}
+
+Table~\ref{tab:ablation} presents the full ablation grid on $n{=}250$ ImageCAS test cases.
+
+\begin{table}[t]
+\caption{Ablation grid on ImageCAS ($n{=}250$ test). Best per-column in \textbf{bold}; $\dagger$ marks significant improvement over L1 baseline (paired bootstrap, $p{<}0.05$). Full fine-tuning (EXP-045) catastrophically overfits despite achieving the highest BCS.}
+\label{tab:ablation}
+\centering
+\small
+\begin{tabular}{llccccc}
+\toprule
+Adaptation & $\lambda_s$ & Dice $\uparrow$ & clDice $\uparrow$ & BCS $\uparrow$ & HD95\,(mm) $\downarrow$ & Betti$_0$ $\downarrow$ \\
+\midrule
+\multicolumn{2}{l}{\textit{L1 baseline ($\lambda_s{=}0$)}} & 0.790 & 0.867 & 0.690 & 10.5 & 4.70 \\
+\midrule
+\multirow{3}{*}{Frozen}
+ & 0.03 & \textbf{0.793}$^\dagger$ & 0.857 & 0.716$^\dagger$ & 8.7$^\dagger$ & 9.44 \\
+ & 0.05 & 0.792$^\dagger$ & 0.856 & 0.722$^\dagger$ & 8.8$^\dagger$ & 9.11 \\
+ & 0.10 & 0.785 & 0.844 & 0.730$^\dagger$ & 10.2 & 13.20 \\
+\midrule
+\multirow{3}{*}{Partial}
+ & 0.03 & \textbf{0.793}$^\dagger$ & 0.858 & 0.715$^\dagger$ & 9.4$^\dagger$ & 8.44 \\
+ & 0.05 & 0.792$^\dagger$ & \textbf{0.861} & 0.724$^\dagger$ & \textbf{8.4}$^\dagger$ & \textbf{8.13} \\
+ & 0.10 & 0.789 & 0.858 & 0.714$^\dagger$ & 8.5$^\dagger$ & 7.95 \\
+\midrule
+BitFit & 0.05 & 0.787 & 0.851 & 0.720$^\dagger$ & 9.5$^\dagger$ & 10.93 \\
+Adapters & 0.05 & 0.781 & 0.840 & 0.715$^\dagger$ & 13.6 & 14.44 \\
+\midrule
+Full & 0.10 & 0.748 & 0.778 & \textbf{0.739} & 33.6 & 19.85 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Effect of BCS weight.}
+Within both frozen and partial rows, increasing $\lambda_s$ monotonically raises BCS but progressively lowers Dice.
+At $\lambda_s{=}0.03$, BCS improves by $+2.6$\,pp over L1 with no Dice penalty; at $\lambda_s{=}0.10$, BCS reaches its peak ($+4.0$\,pp) but Dice drops by $0.5$--$0.8$\,pp.
+The sweet spot is $\lambda_s \in [0.03, 0.05]$.
+
+\paragraph{Frozen vs.\ partial.}
+At matched $\lambda_s$, frozen and partial strategies achieve nearly identical Dice (${\leq}0.1$\,pp difference).
+Partial fine-tuning offers slightly better HD95 and Betti$_0$ at $\lambda_s{=}0.05$ (8.4\,mm and 8.1 vs.\ 8.8\,mm and 9.1), suggesting the unfrozen encoder block contributes to surface precision, but the overall benefit is marginal.
+
+\paragraph{Full fine-tuning.}
+Despite achieving the highest BCS (0.739), full fine-tuning catastrophically overfits: validation Dice reaches 0.807 but test Dice drops to 0.748 (6\,pp gap), and HD95 triples to 33.6\,mm.
+This makes it unsuitable despite its apparent topology advantage.
+Figure~\ref{fig:scatter} visualises the change in Dice and BCS relative to the L1 baseline for all nine experimental cells.
+Decoder-only and partial strategies gain $+2.4$ to $+4.0$\,pp BCS with near-zero Dice change; BitFit and adapters achieve similar BCS gains ($+3.0$ and $+2.5$\,pp) but with small Dice penalties ($-0.3$ and $-0.9$\,pp); full fine-tuning gains the most BCS ($+4.9$\,pp) but loses $-4.2$\,pp Dice.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.95\linewidth]{../figures/fig1_dice_bcs_scatter.pdf}
+\caption{Change in Dice and BCS relative to L1 baseline across all nine experimental cells. Green bars: BCS gain; blue/purple bars: Dice change. All parameter-efficient strategies improve BCS ($+2.4$ to $+4.0$\,pp) with ${\leq}1$\,pp Dice cost. Full fine-tuning (red) gains the most BCS ($+4.9$\,pp) but catastrophically loses $-4.2$\,pp Dice. Decoder-only (frozen) achieves the best Dice--BCS balance.}
+\label{fig:scatter}
+\end{figure}
+
+\subsection{CKA Similarity Analysis}
+
+Table~\ref{tab:cka} shows CKA similarity between the L1 encoder and each fine-tuned encoder at five resolution levels.
+
+\begin{table}[t]
+\caption{CKA similarity to L1 baseline at each encoder level. Higher values indicate preserved representations. All parameter-efficient strategies maintain CKA${\geq}0.84$; full fine-tuning shows severe drift. Frozen CKA is invariant to $\lambda_s$ (encoder weights unchanged).}
+\label{tab:cka}
+\centering
+\small
+\begin{tabular}{lccccc}
+\toprule
+ & \multicolumn{5}{c}{Encoder Level (channels, spatial resolution)} \\
+\cmidrule(lr){2-6}
+Strategy & 32ch, 96$^3$ & 64ch, 48$^3$ & 128ch, 24$^3$ & 256ch, 12$^3$ & 512ch, 6$^3$ \\
+\midrule
+Frozen ($\lambda_s{=}0.05$)  & 1.00 & 0.99 & 0.99 & 0.98 & 0.88 \\
+BitFit ($\lambda_s{=}0.05$)  & 1.00 & 0.99 & 0.99 & 0.98 & 0.89 \\
+Adapter ($\lambda_s{=}0.05$) & 1.00 & 0.99 & 0.99 & 0.97 & \textbf{0.90} \\
+Partial ($\lambda_s{=}0.05$) & 1.00 & 0.99 & 0.99 & 0.97 & 0.84 \\
+Full ($\lambda_s{=}0.10$)    & 0.95 & 0.73 & 0.67 & 0.44 & 0.37 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Frozen strategies produce identical CKA profiles regardless of $\lambda_s$ (expected, as the encoder is fixed).
+The slight CKA drop at the bottleneck (0.88) reflects batch normalisation running statistics drifting during decoder training.
+BitFit and adapter strategies achieve marginally \emph{higher} bottleneck CKA (0.89 and 0.90) than frozen, despite modifying encoder parameters---explicit optimisation of normalisation statistics or addition of lightweight modules appears to stabilise the representation.
+Partial unfreezing allows more drift at the bottleneck (0.84) but preserves all other levels.
+Full fine-tuning drastically reduces CKA at every level, with the bottleneck reaching 0.37---a near-complete reorganisation of the deepest features.
+This confirms that the pretrained encoder already contains topology-relevant representations; all parameter-efficient strategies preserve them, while full fine-tuning \emph{destroys} them.
+Figure~\ref{fig:cka} visualises the full CKA matrix across all nine experimental cells, revealing that frozen strategies are invariant to $\lambda_s$ (identical encoder weights), while the gradient of drift from partial to full is steep and concentrated at deeper levels.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.85\linewidth]{../figures/fig1_cka_heatmap.pdf}
+\caption{How much does fine-tuning change the encoder? The blue band shows the range across all eight parameter-efficient models (frozen, BitFit, adapter, partial); the red line shows full fine-tuning. Parameter-efficient strategies preserve encoder representations at all depths (CKA${>}0.82$); full fine-tuning progressively destroys them, reaching CKA${=}0.37$ at the deepest level.}
+\label{fig:cka}
+\end{figure}
+
+\subsection{Linear Probing: Encoder and Decoder}
+
+Table~\ref{tab:probe} reports bifurcation detection AUC from linear probes on frozen encoder and decoder features.
+
+\begin{table}[t]
+\caption{Linear probe AUC for bifurcation detection at each encoder and decoder level. \textbf{Bold}: highest AUC per model. All parameter-efficient strategies peak at encoder level~1; full fine-tuning shifts the peak to level~2.}
+\label{tab:probe}
+\centering
+\small
+\begin{tabular}{lccccc}
+\toprule
+ & \multicolumn{5}{c}{Encoder Level (AUC)} \\
+\cmidrule(lr){2-6}
+Model & 32ch, 96$^3$ & 64ch, 48$^3$ & 128ch, 24$^3$ & 256ch, 12$^3$ & 512ch, 6$^3$ \\
+\midrule
+L1 baseline             & 0.684 & \textbf{0.813} & 0.772 & 0.705 & 0.620 \\
+Frozen ($\lambda_s{=}0.05$)  & 0.686 & \textbf{0.811} & 0.763 & 0.705 & 0.623 \\
+BitFit ($\lambda_s{=}0.05$)  & 0.687 & \textbf{0.812} & 0.765 & 0.706 & 0.621 \\
+Adapter ($\lambda_s{=}0.05$) & 0.687 & \textbf{0.811} & 0.763 & 0.705 & 0.614 \\
+Partial ($\lambda_s{=}0.05$) & 0.687 & \textbf{0.811} & 0.763 & 0.700 & 0.602 \\
+Full ($\lambda_s{=}0.10$)    & 0.680 & 0.773 & \textbf{0.794} & 0.694 & 0.638 \\
+\midrule
+ & \multicolumn{4}{c}{Decoder Level (AUC)} & \\
+\cmidrule(lr){2-5}
+ & 256ch, 12$^3$ & 128ch, 24$^3$ & 64ch, 48$^3$ & 32ch, 96$^3$ & \\
+\midrule
+L1 baseline             & 0.670 & 0.710 & \textbf{0.760} & 0.705 & \\
+Frozen ($\lambda_s{=}0.05$)  & 0.667 & 0.710 & \textbf{0.756} & 0.690 & \\
+BitFit ($\lambda_s{=}0.05$)  & 0.669 & 0.712 & \textbf{0.758} & 0.690 & \\
+Adapter ($\lambda_s{=}0.05$) & 0.676 & 0.708 & \textbf{0.755} & 0.694 & \\
+Partial ($\lambda_s{=}0.05$) & 0.669 & 0.708 & \textbf{0.750} & 0.692 & \\
+Full ($\lambda_s{=}0.10$)    & 0.676 & \textbf{0.766} & 0.754 & 0.665 & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+In the encoder, all parameter-efficient strategies (frozen, BitFit, adapter, partial) peak at level~1 (64ch, 48$^3$; AUC${\approx}$0.81), nearly identical to the L1 baseline---confirming that these strategies preserve the encoder's bifurcation-discriminative features regardless of how many encoder parameters are trainable.
+Full fine-tuning shifts the peak to level~2 (AUC~0.79), indicating feature hierarchy reorganisation rather than enhancement.
+
+In the decoder, all models peak at level~2 (64ch, 48$^3$; AUC${\approx}$0.75--0.76).
+Full fine-tuning again shows a shifted peak (level~1, AUC~0.77).
+The overall similarity across decoder probes suggests that the Soft BCS loss refines how bifurcation information is routed to the segmentation output rather than dramatically relocating it within the network.
+
+\subsection{ASOCA: Zero-Shot Transfer under Protocol Mismatch}
+\label{sec:asoca_results}
+
+Table~\ref{tab:zeroshot} reports zero-shot performance on ASOCA ($N{=}40$).
+
+\begin{table}[t]
+\caption{Zero-shot transfer to ASOCA ($N{=}40$). ImageCAS-pretrained models over-segment: high BCS (branches preserved) but low Dice (side branches penalised by major-vessel GT). Higher $\lambda_s$ increases BCS but further reduces Dice.}
+\label{tab:zeroshot}
+\centering
+\small
+\begin{tabular}{llccccc}
+\toprule
+Adaptation & $\lambda_s$ & Dice $\uparrow$ & BCS $\uparrow$ & HD95\,(mm) $\downarrow$ & Betti$_0$ $\downarrow$ \\
+\midrule
+\multicolumn{2}{l}{\textit{L1 baseline ($\lambda_s{=}0$)}} & \textbf{0.481} & 0.794 & \textbf{15.7} & \textbf{7.1} \\
+\midrule
+\multirow{3}{*}{Frozen}
+ & 0.03 & 0.461 & 0.821 & 17.3 & 11.3 \\
+ & 0.05 & 0.446 & 0.824 & 21.1 & 13.8 \\
+ & 0.10 & 0.430 & \textbf{0.838} & 25.9 & 21.4 \\
+\midrule
+BitFit & 0.05 & 0.447 & 0.834 & 19.8 & 12.1 \\
+\midrule
+\multirow{3}{*}{Partial}
+ & 0.03 & 0.453 & 0.815 & 22.6 & 14.5 \\
+ & 0.05 & 0.431 & 0.829 & 21.9 & 14.8 \\
+ & 0.10 & 0.446 & 0.830 & 20.4 & 14.4 \\
+\midrule
+Full & 0.10 & 0.423 & 0.831 & 43.0 & 21.6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All models achieve high BCS (${\geq}0.79$) on ASOCA despite low Dice (${\leq}0.48$), confirming systematic over-segmentation due to annotation protocol mismatch rather than image-domain shift: the models predict too \emph{much} rather than too little.
+Higher $\lambda_s$ further increases BCS ($+4.4$\,pp for frozen $\lambda_s{=}0.10$) at the cost of Dice ($-5.1$\,pp), amplifying the mismatch.
+A threshold sweep ($t \in [0.3, 0.9]$) reveals that BCS remains remarkably stable (${\pm}2$\,pp) while Dice improves monotonically with higher thresholds.
+At $t{=}0.9$, L1 recovers $+18$\,pp Dice (0.479${\to}$0.665) with only $-1.6$\,pp BCS loss.
+Importantly, L1 outperforms all BCS-trained models at every threshold on ASOCA---BCS training reinforces branch preservation, which is precisely the opposite of what major-vessel-only annotations require.
+Figure~\ref{fig:threshold} shows the full threshold sweep: Dice increases monotonically with threshold while BCS remains stable (${\pm}2$\,pp), offering a cost-free calibration knob for protocol mismatch.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{../figures/fig3_asoca_threshold.pdf}
+\caption{Threshold calibration on ASOCA: a free lunch for protocol mismatch. \textbf{(a)}~Raising the binarisation threshold from 0.5 to 0.9 recovers $+18.6$\,pp Dice (green shading marks the improvement zone); L1 outperforms all BCS-trained models at every threshold. \textbf{(b)}~BCS remains stable across thresholds (${\pm}2$\,pp), confirming that overlap gains come at no connectivity cost.}
+\label{fig:threshold}
+\end{figure}
+
+\subsection{ASOCA: Low-Shot Adaptation}
+
+We fine-tune the L1 decoder on ASOCA with $k \in \{1, 5, 10\}$ scans per group (total $2k$ training cases), freezing the encoder and first two decoder levels (only the last two decoder levels are trainable).
+This shallow adaptation follows the insight that the model needs to \emph{suppress} side branches rather than learn new features.
+Table~\ref{tab:lowshot} reports topology-aware fine-tuning ($\lambda_s{=}0.05$) at the optimal binarisation threshold per $k$.
+
+\begin{table}[t]
+\caption{Low-shot fine-tuning on ASOCA with topology-aware supervision ($\lambda_s{=}0.05$). Only the last two decoder levels are trainable. Results at the optimal binarisation threshold per $k$. $k{=}1$ achieves the best Dice--BCS balance; more data overfits to ASOCA's sparse annotations.}
+\label{tab:lowshot}
+\centering
+\small
+\begin{tabular}{ccccccc}
+\toprule
+$k$ & $t$ & $n_{\mathrm{eval}}$ & Dice $\uparrow$ & BCS $\uparrow$ & HD95\,(mm) $\downarrow$ & Betti$_0$ $\downarrow$ \\
+\midrule
+\multicolumn{2}{l}{\textit{Zero-shot ($t{=}0.5$)}} & 40 & 0.481 & 0.794 & 15.7 & 7.1 \\
+\multicolumn{2}{l}{\textit{Zero-shot ($t{=}0.9$)}} & 40 & 0.665 & 0.791 & 13.0 & 10.0 \\
+\midrule
+1  & 0.7 & 34 & \textbf{0.706} & \textbf{0.752} & \textbf{10.6} & 13.1 \\
+5  & 0.4 & 26 & 0.695 & 0.699 & 26.8 & --- \\
+10 & 0.4 & 16 & 0.671 & 0.751 & 46.4 & 64.6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Remarkably, $k{=}1$ (just two training scans) at $t{=}0.7$ achieves the best combined performance: Dice~0.706 ($+22.5$\,pp over zero-shot), BCS~0.752, and HD95~10.6\,mm.
+Adding more ASOCA training data ($k{=}5$, $k{=}10$) paradoxically degrades performance---BCS drops by $5$--$5.3$\,pp and HD95 increases sharply---indicating that the model overfits to ASOCA's sparser annotation protocol, destroying the pretrained topology-aware features.
+The shallow decoder freeze (depth~2) is critical: our earlier experiment with full decoder fine-tuning (7 training cases, $\lambda_s{=}0.30$) achieved similar Dice (0.701) but catastrophically lower BCS (0.679) and Betti error (36.4 vs.\ 13.1).
+
+%----------------------------------------------------------------------
+\section{Discussion}
+
+\paragraph{Decoder-only adaptation is sufficient.}
+The central finding of the ImageCAS ablation is that topology-aware fine-tuning does not require modifying the pretrained encoder.
+Decoder-only fine-tuning achieves the best balance (Dice~0.793, BCS~0.716); BitFit and adapter strategies achieve comparable BCS ($+3.0$ and $+2.5$\,pp) but at a Dice cost ($-0.3$ and $-0.9$\,pp respectively), while full fine-tuning catastrophically overfits.
+CKA analysis provides a mechanistic explanation: the pretrained encoder already encodes topology-relevant features (linear probes detect bifurcations at AUC~0.81 at all parameter-efficient strategies), and the decoder simply learns to exploit them for connectivity.
+Notably, adapter modules achieve the highest bottleneck CKA (0.90), yet this superior representation preservation does not translate to measurably better segmentation---confirming that the encoder is already sufficient and the decoder is where adaptation matters.
+Full fine-tuning destroys these representations (CKA drops to 0.37 at the bottleneck), explaining the 6\,pp val--test Dice gap.
+This mirrors findings from NLP and 2D transfer learning~\cite{kumar_finetuning_2022}, extending them to 3D topology-aware medical image segmentation.
+
+\paragraph{BCS weight controls the overlap--connectivity trade-off.}
+Within the effective strategies (frozen and partial), increasing $\lambda_s$ monotonically improves BCS at the cost of Dice.
+The effect is modest: from $\lambda_s{=}0.03$ to $\lambda_s{=}0.10$, BCS improves by $+1.4$\,pp but Dice drops by $0.8$\,pp.
+This suggests a Pareto frontier that practitioners can navigate based on downstream requirements---higher $\lambda_s$ for connectivity-critical applications (FFR-CT, stent planning), lower $\lambda_s$ for volumetric accuracy.
+
+\paragraph{Annotation protocol mismatch.}
+Zero-shot transfer to ASOCA reveals a striking dissociation: BCS is high (0.794) but Dice is low (0.481).
+The model correctly identifies vascular branches, including those that are part of the full coronary tree but absent from ASOCA's major-vessel annotations.
+Threshold tuning ($t{=}0.9$) recovers $+18$\,pp Dice with only $-1.6$\,pp BCS loss, while $k{=}1$ low-shot fine-tuning with topology supervision achieves Dice~0.706 at BCS~0.752.
+Crucially, more training data ($k{=}5$, $k{=}10$) \emph{degrades} performance, suggesting that the model overfits to the sparser annotation protocol.
+Furthermore, starting low-shot adaptation from a BCS-trained checkpoint (frozen $\lambda_s{=}0.05$) rather than the L1 baseline yields worse results (Dice~0.680, BCS~0.624 vs.\ 0.706/0.752), indicating that topology-aware pretraining on full-tree annotations actively hinders adaptation to a major-vessel protocol---the learned branch-preservation features resist suppression.
+This highlights that annotation protocol mismatch requires careful calibration rather than brute-force supervised adaptation.
+
+\paragraph{Limitations.}
+This study evaluates a single foundation model (CT-FM SegResNet); generality to other architectures remains to be tested.
+ASOCA's small size ($N{=}40$) limits statistical power for the low-shot analysis, and the $k{=}1$ result uses only 34 evaluation cases.
+The Soft BCS loss requires precomputed skeleton labels, which may not always be available.
+
+%----------------------------------------------------------------------
+\section{Conclusion}
+
+We presented a systematic study of encoder adaptation strategies for topology-aware fine-tuning of a CT foundation model for coronary artery segmentation.
+Decoder-only fine-tuning achieves the best overlap--connectivity balance, preserving pretrained encoder features (CKA${\geq}0.84$) while enabling the decoder to learn bifurcation-level connectivity.
+BitFit and adapter strategies confirm that even minimal encoder modification yields equivalent representations---the encoder already contains topology-relevant features that the decoder need only learn to exploit.
+Full fine-tuning catastrophically overfits despite achieving the highest BCS.
+On ASOCA, annotation protocol mismatch causes systematic over-segmentation that BCS training amplifies rather than mitigates; minimal adaptation ($k{=}1$ with shallow decoder fine-tuning and threshold calibration) recovers Dice from 0.481 to 0.706, while starting from a BCS-pretrained checkpoint or adding more training data paradoxically degrades performance.
+These findings suggest that practitioners should freeze the encoder and focus adaptation on the decoder when adding topology-aware objectives, and that cross-domain deployment under annotation protocol mismatch requires calibration rather than additional supervised training.
+
+%----------------------------------------------------------------------
+\begin{credits}
+\subsubsection{\ackname}
+This research was supported by [funder and project code to be disclosed upon publication].
+
+\subsubsection{\discintname}
+The authors have no competing interests to declare that are relevant to the content of this article.
+\end{credits}
+
+\bibliographystyle{splncs04}
+\bibliography{references}
+
+\end{document}
