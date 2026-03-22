@@ -28,4 +28,4 @@ Python | PyTorch | MONAI | nnU-Net | Docker | HPC (SLURM)
 
 ### Links
 
-[Google Scholar](#) | [LinkedIn](#) | [University of Lincoln](#)
+[Google Scholar](https://scholar.google.co.uk/citations?user=XVRCI0IAAAAJ&hl=en) | [LinkedIn](https://www.linkedin.com/in/maame-owusu-ansah/)
