@@ -22,7 +22,7 @@ pip install torch monai scikit-image scipy nibabel lighter-zoo tqdm matplotlib
 ```
 coronary-analysis/
 ├── papers/
-│   ├── miccai2026/code_release/       # MICCAI 2026 — BCS metric & Soft BCS training
+│   ├── miccai2026/code_release/       # MICCAI 2026 — 
 │   │   ├── metrics/                   # --- implementation (Algorithm 1)
 │   │   ├── training/                  # CT-FM and nnU-Net trainers
 │   │   ├── inference/                 # Sliding window inference
