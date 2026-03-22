@@ -116,7 +116,7 @@ python papers/miccai2026/code_release/analysis/bootstrap_l4_vs_l1.py
 
 **MICCAI 2026** — *When Dice Deceives: A Topology-Aware Evaluation of Coronary Artery Segmentation Using Bifurcation Connectedness*
 
-**MIUA 2026** — *Topology-aware Low-shot Adaptation of CT Foundation Models for Coronary Artery Segmentation*
+**MIUA 2026** — *Adapt or Preserve? Encoder Strategy for Topology-Aware CT Foundation Models*
 
 **MedIA** —  (in preparation)
 
