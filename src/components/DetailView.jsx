@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { tagStyle, getPaperUrl, getPdfUrl, genSchematic } from '../utils'
 
-export default function DetailView({ paper, apiKey, onBack, onDelete, onToggleRead, onUpdateNotes, onUpdateFigure, onUpdateSchematic, speaking, onSpeak }) {
+export default function DetailView({ paper, apiKey, onBack, onDelete, onToggleRead, onToggleStar, onUpdateNotes, onUpdateFigure, onUpdateSchematic, speaking, onSpeak }) {
   const p = paper, s = p.summary || {}
   const pUrl = getPaperUrl(p), pdfUrl = getPdfUrl(p)
   const figRef = useRef(null)
@@ -40,6 +40,7 @@ export default function DetailView({ paper, apiKey, onBack, onDelete, onToggleRe
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => onToggleStar(p.id)} className="btn-sec" style={{ color: p.starred ? '#c4c470' : 'var(--text-muted)', fontSize: 16, padding: '8px 12px' }}>{p.starred ? '★' : '☆'}</button>
           <button onClick={() => onSpeak(p)} className="btn-primary">{speaking ? '■ Stop' : '▶ Listen'}</button>
           <button onClick={() => onToggleRead(p.id)} className="btn-sec">{p.readStatus === 'read' ? '✓ Read' : '○ Unread'}</button>
           <button onClick={() => onDelete(p.id)} className="btn-sec" style={{ color: 'var(--accent-red)' }}>Delete</button>

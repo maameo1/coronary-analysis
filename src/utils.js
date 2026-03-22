@@ -135,3 +135,81 @@ export function computeRelationships(papers) {
   }
   return rels.sort((a, b) => b.strength - a.strength)
 }
+
+// Compute clusters using union-find on connected papers
+export function computeClusters(papers, rels) {
+  if (!papers.length) return []
+  // Union-Find
+  const parent = {}
+  papers.forEach(p => { parent[p.id] = p.id })
+  function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x] } return x }
+  function union(a, b) { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb }
+
+  // Connect papers that share relationships
+  for (const r of rels) {
+    if (r.strength >= 1) union(r.a, r.b)
+  }
+
+  // Group papers by cluster root
+  const groups = {}
+  for (const p of papers) {
+    const root = find(p.id)
+    if (!groups[root]) groups[root] = []
+    groups[root].push(p)
+  }
+
+  // Build cluster objects with labels
+  const clusters = Object.values(groups)
+    .filter(g => g.length >= 2) // only clusters with 2+ papers
+    .map(group => {
+      // Find shared tags across cluster
+      const tagCounts = {}
+      group.forEach(p => (p.summary?.tags || []).forEach(t => { tagCounts[t] = (tagCounts[t] || 0) + 1 }))
+      const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0])
+
+      // Find shared methods
+      const methodCounts = {}
+      group.forEach(p => (p.summary?.methods || []).forEach(m => { const k = m.toLowerCase(); methodCounts[k] = (methodCounts[k] || 0) + 1 }))
+      const topMethods = Object.entries(methodCounts).sort((a, b) => b[1] - a[1]).slice(0, 2).map(e => e[0])
+
+      // Generate cluster name from top tags/methods
+      const nameParts = topTags.length > 0 ? topTags.slice(0, 2) : topMethods.slice(0, 2)
+      const name = nameParts.length > 0 ? nameParts.join(' + ') : 'Group of ' + group.length + ' papers'
+
+      // Find internal relationships
+      const groupIds = new Set(group.map(p => p.id))
+      const internalRels = rels.filter(r => groupIds.has(r.a) && groupIds.has(r.b))
+
+      // Collect all reasons
+      const allReasons = new Set()
+      internalRels.forEach(r => r.reasons.forEach(reason => allReasons.add(reason)))
+
+      return {
+        name,
+        papers: group,
+        tags: topTags,
+        methods: topMethods,
+        reasons: [...allReasons].slice(0, 6),
+        size: group.length,
+      }
+    })
+    .sort((a, b) => b.size - a.size)
+
+  // Also find "bridge" papers — papers connected to multiple clusters
+  const bridges = []
+  for (const p of papers) {
+    const connectedClusters = new Set()
+    for (const r of rels) {
+      if (r.a === p.id || r.b === p.id) {
+        const otherId = r.a === p.id ? r.b : r.a
+        const otherCluster = clusters.findIndex(c => c.papers.some(cp => cp.id === otherId))
+        if (otherCluster >= 0) connectedClusters.add(otherCluster)
+      }
+    }
+    if (connectedClusters.size >= 2) {
+      bridges.push({ paper: p, clusters: [...connectedClusters].map(i => clusters[i]?.name || 'Unknown') })
+    }
+  }
+
+  return { clusters, bridges }
+}

@@ -139,6 +139,7 @@ export default function App() {
 
   function del(id) { setPapers(p => p.filter(x => x.id !== id)); if (selected?.id === id) { setSelected(null); setTab('library') } }
   function togRead(id) { setPapers(p => p.map(x => x.id === id ? { ...x, readStatus: x.readStatus === 'read' ? 'unread' : 'read' } : x)) }
+  function togStar(id) { setPapers(p => p.map(x => x.id === id ? { ...x, starred: !x.starred } : x)); if (selected?.id === id) setSelected(p => ({ ...p, starred: !p.starred })) }
   function updNotes(id, n) { setPapers(p => p.map(x => x.id === id ? { ...x, notes: n } : x)); if (selected?.id === id) setSelected(p => ({ ...p, notes: n })) }
   function updFigure(id, fig) {
     // Warn if figure is very large (base64 images can be huge)
@@ -151,10 +152,14 @@ export default function App() {
   function updSchematic(id, svg) { setPapers(p => p.map(x => x.id === id ? { ...x, schematic: svg } : x)); if (selected?.id === id) setSelected(p => ({ ...p, schematic: svg })) }
   function spk(p) { if (speaking) { speechSynthesis.cancel(); setSpeaking(false); return }; const u = new SpeechSynthesisUtterance(p.title + '. ' + (p.summary?.tldr || '')); u.rate = 0.95; u.onend = () => setSpeaking(false); setSpeaking(true); speechSynthesis.speak(u) }
 
+  const [showStarred, setShowStarred] = useState(false)
+
   const allTags = [...new Set(papers.flatMap(p => p.summary?.tags || []))]
   const filtered = papers.filter(p => {
     const ms = !search || p.title?.toLowerCase().includes(search.toLowerCase()) || p.summary?.tldr?.toLowerCase().includes(search.toLowerCase()) || p.authors?.some(a => a.toLowerCase().includes(search.toLowerCase()))
-    return ms && (!filterTag || p.summary?.tags?.includes(filterTag))
+    const tagMatch = !filterTag || p.summary?.tags?.includes(filterTag)
+    const starMatch = !showStarred || p.starred
+    return ms && tagMatch && starMatch
   })
   const unsum = papers.filter(p => !p.summary).length
 
@@ -190,7 +195,7 @@ export default function App() {
 
   // ── Route views ────────────────────────────────────────────────────────
   if (tab === 'detail' && selected) {
-    return (<div>{headerEl}<DetailView paper={selected} apiKey={apiKey} onBack={() => { speechSynthesis.cancel(); setSpeaking(false); setTab('library') }} onDelete={del} onToggleRead={togRead} onUpdateNotes={updNotes} onUpdateFigure={updFigure} onUpdateSchematic={updSchematic} speaking={speaking} onSpeak={spk} />{settingsEl}</div>)
+    return (<div>{headerEl}<DetailView paper={selected} apiKey={apiKey} onBack={() => { speechSynthesis.cancel(); setSpeaking(false); setTab('library') }} onDelete={del} onToggleRead={togRead} onToggleStar={togStar} onUpdateNotes={updNotes} onUpdateFigure={updFigure} onUpdateSchematic={updSchematic} speaking={speaking} onSpeak={spk} />{settingsEl}</div>)
   }
   if (tab === 'graph') {
     return (<div>{headerEl}<GraphView papers={papers} onSelect={id => { const p = papers.find(x => x.id === id); if (p) { setSelected(p); setTab('detail') } }} />{settingsEl}</div>)
@@ -199,5 +204,5 @@ export default function App() {
     return (<div>{headerEl}<GapView papers={papers} gap={gap} gapL={gapL} onRunGap={runGap} />{settingsEl}</div>)
   }
 
-  return (<div>{headerEl}<LibraryView papers={papers} filtered={filtered} allTags={allTags} filterTag={filterTag} setFilterTag={setFilterTag} search={search} setSearch={setSearch} unsum={unsum} sumL={sumL} loadingMsg={loadingMsg} onSumAll={sumAll} onSelect={p => { setSelected(p); setTab('detail') }} />{settingsEl}</div>)
+  return (<div>{headerEl}<LibraryView papers={papers} filtered={filtered} allTags={allTags} filterTag={filterTag} setFilterTag={setFilterTag} search={search} setSearch={setSearch} unsum={unsum} sumL={sumL} loadingMsg={loadingMsg} onSumAll={sumAll} onSelect={p => { setSelected(p); setTab('detail') }} onToggleStar={togStar} showStarred={showStarred} setShowStarred={setShowStarred} />{settingsEl}</div>)
 }
