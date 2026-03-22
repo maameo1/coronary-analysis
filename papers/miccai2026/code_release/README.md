@@ -6,7 +6,7 @@ Code accompanying the MICCAI 2026 submission:
 ## Overview
 
 This repository contains the full implementation for:
-1. **Bifurcation Connectivity Score (BCS)** — a topology-sensitive metric for coronary artery segmentation
+1. **Bifurcation Connectedness Score (BCS)** — a topology-sensitive metric for coronary artery segmentation
 2. **Soft BCS Loss** — a differentiable surrogate for end-to-end training
 3. **Multi-task CT-FM** — SegResNet foundation model with segmentation + vesselness decoders
 4. **Training, inference, and analysis scripts** for all experiments in Table 1
