@@ -10,16 +10,11 @@ Topology-aware deep learning for coronary artery segmentation from cardiac CT.
 
 Standard overlap metrics like Dice can score 0.79 on coronary artery segmentation while silently missing 30% of vessel bifurcations — structural failures invisible to voxel counting but critical for clinical planning. A cardiologist tracing a vessel tree needs every junction intact; one broken bifurcation loses the entire downstream territory from the 3D model.
 
-This repository introduces the **Bifurcation Connectivity Score (BCS)**, a topology-sensitive evaluation metric that directly counts preserved branch points, and **Soft BCS Loss**, its differentiable surrogate for end-to-end training. Validated on 1,000 cardiac CT volumes from ImageCAS with integration for MONAI SegResNet and nnU-Net.
+This repository introduces the **Bifurcation Connectedness Score (BCS)**, a topology-sensitive evaluation metric that directly counts preserved branch points, and **Soft BCS Loss**, its differentiable surrogate for end-to-end training. Validated on 1,000 cardiac CT volumes from ImageCAS with integration for MONAI SegResNet and nnU-Net.
 
-## Key Results
+## Key Results -TBD
 
-| Model | Dice | BCS | HD95 |
-|-------|------|-----|------|
-| L₁ baseline (DiceCE + vesselness) | 0.790 | 0.690 | 17.5 |
-| **Lₛ (+ Soft BCS fine-tuning)** | **0.792** | **0.716** | **8.7** |
 
-Soft BCS fine-tuning improves bifurcation preservation by +3.8% (absolute) and halves the Hausdorff distance while maintaining Dice — topology gains at no cost to overlap.
 
 ## Quick Start
 
