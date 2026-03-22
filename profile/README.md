@@ -9,14 +9,14 @@ Developing topology-aware evaluation and training methods for tubular structure 
 - Topology-aware metrics and loss functions for vessel segmentation (Bifurcation Connectivity Score)
 - Data-efficient deep learning for coronary artery segmentation
 - Foundation model fine-tuning for cardiac CT
-- Clinical AI deployment (Guy's & St Thomas' / King's College London)
+- Clinical AI deployment ()
 
 ### Publications
 
 - **[Journal of Neurology, 2026]** Striatal volume in dystonia *(Published)*
 - **[MICCAI 2026]** When Dice Deceives: BCS reveals topology failures in coronary artery segmentation *(Submitted)*
 - **[MIUA 2026]** Topology-aware low-shot adaptation of CT foundation models *(Submitted)*
-- **[MedIA]** BCS-F1: Topology-aware metric and differentiable loss for tubular segmentation *(In preparation)*
+- **[MedIA]***(In preparation)*
 
 ### Featured Projects
 
