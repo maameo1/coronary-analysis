@@ -118,7 +118,7 @@ python papers/miccai2026/code_release/analysis/bootstrap_l4_vs_l1.py
 
 **MIUA 2026** — *Topology-aware Low-shot Adaptation of CT Foundation Models for Coronary Artery Segmentation*
 
-**MedIA** — *BCS-F1: Topology-aware Metric and Differentiable Loss for Tubular Structure Segmentation* (in preparation)
+**MedIA** —  (in preparation)
 
 ## Citation
 
@@ -138,8 +138,7 @@ If you use BCS or Soft BCS Loss in your research, please cite:
 }
 
 @inproceedings{owusuansah2026topology,
-  title     = {Topology-aware Low-shot Adaptation of CT Foundation Models
-               for Coronary Artery Segmentation},
+  title     = {Adapt or Preserve? Encoder Strategy for Topology-Aware CT Foundation Models},
   author    = {Owusu-Ansah, Maame and others},
   booktitle = {Medical Image Understanding and Analysis (MIUA)},
   year      = {2026}
