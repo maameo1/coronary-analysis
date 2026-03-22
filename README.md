@@ -159,4 +159,4 @@ If you use BCS or Soft BCS Loss in your research, please cite:
 
 ## Acknowledgements
 
-University of Lincoln | Guy's & St Thomas' NHS Foundation Trust / King's College London | [ImageCAS](https://github.com/XiaoweiXu/ImageCAS) | [CT-FM](https://huggingface.co/project-lighter/ct_fm_segresnet)
+University of Lincoln | [ImageCAS](https://github.com/XiaoweiXu/ImageCAS) | [CT-FM](https://huggingface.co/project-lighter/ct_fm_segresnet)
