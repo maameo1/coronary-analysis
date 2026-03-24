@@ -211,7 +211,7 @@ export default function App() {
     </>
   )
 
-  const settingsEl = <Settings show={showSet} onClose={() => setShowSet(false)} apiKey={apiKey} setApiKey={setApiKey} zUid={zUid} setZUid={setZUid} zKey={zKey} setZKey={setZKey} zotImp={zotImp} zotL={zotL} />
+  const settingsEl = <Settings show={showSet} onClose={() => setShowSet(false)} apiKey={apiKey} setApiKey={setApiKey} zUid={zUid} setZUid={setZUid} zKey={zKey} setZKey={setZKey} zotImp={zotImp} zotL={zotL} papers={papers} setPapers={setPapers} gap={gap} setGap={setGap} />
 
   // ── Route views ────────────────────────────────────────────────────────
   if (tab === 'detail' && selected) {
