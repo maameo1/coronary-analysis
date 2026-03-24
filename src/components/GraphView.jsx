@@ -1,12 +1,12 @@
-import { useRef, useEffect, useState, useCallback } from 'react'
+import { useRef, useEffect, useState, useMemo } from 'react'
 import { gtc, tagStyle, computeRelationships, computeClusters } from '../utils'
 
 export default function GraphView({ papers, onSelect }) {
-  const withSummary = papers.filter(p => p.summary)
-  const rels = computeRelationships(withSummary)
-  const { clusters, bridges } = withSummary.length >= 2 ? computeClusters(withSummary, rels) : { clusters: [], bridges: [] }
+  const withSummary = useMemo(() => papers.filter(p => p.summary), [papers])
+  const rels = useMemo(() => computeRelationships(withSummary), [withSummary])
+  const { clusters, bridges } = useMemo(() => withSummary.length >= 2 ? computeClusters(withSummary, rels) : { clusters: [], bridges: [] }, [withSummary, rels])
   const [activeTab, setActiveTab] = useState('clusters')
-  const COLORS = ['#5b8a72', '#7eb8da', '#9070c4', '#c49070', '#c4c470', '#c47070', '#7ec4c4', '#c490d1']
+  const COLORS = useMemo(() => ['#5b8a72', '#7eb8da', '#9070c4', '#c49070', '#c4c470', '#c47070', '#7ec4c4', '#c490d1'], [])
 
   if (withSummary.length < 2) {
     return (
@@ -112,16 +112,19 @@ function ConnectionsTab({ rels, onSelect }) {
 // ── Interactive Graph with Zoom + Pan + Tooltips ─────────────────────────
 function InteractiveGraph({ papers, clusters, rels, onSelect, colors }) {
   const canvasRef = useRef(null)
+  const tooltipRef = useRef(null)
   const nodesRef = useRef([])
   const edgesRef = useRef([])
   const viewRef = useRef({ x: 0, y: 0, scale: 1 })
   const dragRef = useRef({ dragging: false, startX: 0, startY: 0, startViewX: 0, startViewY: 0 })
-  const [tooltip, setTooltip] = useState(null)
-  const [hoveredId, setHoveredId] = useState(null)
+  const hoveredRef = useRef(null)
 
-  // Build cluster color map
-  const clusterMap = {}
-  clusters.forEach((c, ci) => { c.papers.forEach(p => { clusterMap[p.id] = ci }) })
+  // Build cluster color map (only when clusters change)
+  const clusterMap = useMemo(() => {
+    const m = {}
+    clusters.forEach((c, ci) => { c.papers.forEach(p => { m[p.id] = ci }) })
+    return m
+  }, [clusters])
 
   // Initialize nodes and run force simulation
   useEffect(() => {
@@ -129,11 +132,15 @@ function InteractiveGraph({ papers, clusters, rels, onSelect, colors }) {
       const angle = (2 * Math.PI * i) / papers.length
       const r = Math.min(280, papers.length * 20)
       const ci = clusterMap[p.id]
-      return { id: p.id, title: p.title, tags: p.summary?.tags || [], color: ci !== undefined ? colors[ci % colors.length] : '#3a4555', x: 400 + r * Math.cos(angle), y: 320 + r * Math.sin(angle), vx: 0, vy: 0 }
+      return { id: p.id, title: p.title, color: ci !== undefined ? colors[ci % colors.length] : '#3a4555', x: 400 + r * Math.cos(angle), y: 320 + r * Math.sin(angle), vx: 0, vy: 0 }
     })
-    const edges = rels.filter(r => r.strength >= 1).map(r => ({ source: r.a, target: r.b, strength: r.strength, reasons: r.reasons }))
+    // Build edge lookup map for O(1) access
+    const edgeList = rels.filter(r => r.strength >= 1).map(r => ({ source: r.a, target: r.b, strength: r.strength, reasons: r.reasons }))
+    const nodeMap = {}
+    nodes.forEach(n => { nodeMap[n.id] = n })
 
-    for (let iter = 0; iter < 150; iter++) {
+    // Force simulation — use nodeMap for O(1) lookups
+    for (let iter = 0; iter < 100; iter++) {
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
           const dx = nodes[j].x - nodes[i].x, dy = nodes[j].y - nodes[i].y
@@ -143,8 +150,8 @@ function InteractiveGraph({ papers, clusters, rels, onSelect, colors }) {
           nodes[j].vx += (dx / dist) * f; nodes[j].vy += (dy / dist) * f
         }
       }
-      for (const e of edges) {
-        const s = nodes.find(n => n.id === e.source), t = nodes.find(n => n.id === e.target)
+      for (const e of edgeList) {
+        const s = nodeMap[e.source], t = nodeMap[e.target]
         if (!s || !t) continue
         const dx = t.x - s.x, dy = t.y - s.y, dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1)
         const f = (dist - 160) * 0.01 * e.strength
@@ -156,84 +163,65 @@ function InteractiveGraph({ papers, clusters, rels, onSelect, colors }) {
         n.x += n.vx * 0.3; n.y += n.vy * 0.3; n.vx *= 0.75; n.vy *= 0.75
       }
     }
-    nodesRef.current = nodes; edgesRef.current = edges
+    nodesRef.current = nodes; edgesRef.current = edgeList
     viewRef.current = { x: 0, y: 0, scale: 1 }
     draw()
-  }, [papers, clusters])
+  }, [papers, clusterMap, rels])
 
-  const draw = useCallback(() => {
+  function draw() {
     const canvas = canvasRef.current; if (!canvas) return
     const ctx = canvas.getContext('2d')
     const W = 800, H = 640
     const { x: vx, y: vy, scale } = viewRef.current
     const nodes = nodesRef.current, edges = edgesRef.current
+    const hid = hoveredRef.current
 
     ctx.clearRect(0, 0, W, H); ctx.fillStyle = '#0a0e13'; ctx.fillRect(0, 0, W, H)
+    ctx.save(); ctx.translate(vx, vy); ctx.scale(scale, scale)
 
-    ctx.save()
-    ctx.translate(vx, vy)
-    ctx.scale(scale, scale)
+    // Build connected set for hovered node (once per draw, not per edge)
+    const connectedIds = new Set()
+    if (hid) { edges.forEach(e => { if (e.source === hid) connectedIds.add(e.target); if (e.target === hid) connectedIds.add(e.source) }) }
 
-    // Draw edges
     for (const e of edges) {
       const s = nodes.find(n => n.id === e.source), t = nodes.find(n => n.id === e.target)
       if (!s || !t) continue
-      const isHighlighted = hoveredId && (e.source === hoveredId || e.target === hoveredId)
+      const isHL = hid && (e.source === hid || e.target === hid)
       ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(t.x, t.y)
-      ctx.strokeStyle = isHighlighted ? '#4a8a5a' : (e.strength >= 3 ? '#2a5a3a' : e.strength >= 2 ? '#1e3a2e' : '#162520')
-      ctx.lineWidth = isHighlighted ? Math.min(e.strength + 1, 4) : Math.min(e.strength, 3)
-      ctx.stroke()
-
-      // Draw edge label if highlighted
-      if (isHighlighted && e.reasons) {
+      ctx.strokeStyle = isHL ? '#4a8a5a' : (e.strength >= 3 ? '#2a5a3a' : e.strength >= 2 ? '#1e3a2e' : '#162520')
+      ctx.lineWidth = isHL ? Math.min(e.strength + 1, 4) : Math.min(e.strength, 3); ctx.stroke()
+      if (isHL && e.reasons) {
         const mx = (s.x + t.x) / 2, my = (s.y + t.y) / 2
         ctx.fillStyle = '#6a8a7a'; ctx.font = '8px Arial'; ctx.textAlign = 'center'
         ctx.fillText(e.reasons[0] || '', mx, my - 4)
       }
     }
 
-    // Draw nodes
     for (const n of nodes) {
-      const isH = hoveredId === n.id
-      const isConnected = hoveredId && edges.some(e => (e.source === hoveredId && e.target === n.id) || (e.target === hoveredId && e.source === n.id))
-      const radius = isH ? 14 : (isConnected ? 11 : 8)
-      const alpha = hoveredId ? (isH || isConnected ? 1 : 0.3) : 1
-
-      ctx.globalAlpha = alpha
-      // Glow for hovered
-      if (isH) {
-        ctx.beginPath(); ctx.arc(n.x, n.y, 20, 0, Math.PI * 2)
-        ctx.fillStyle = n.color + '30'; ctx.fill()
-      }
+      const isH = hid === n.id
+      const isConn = hid ? connectedIds.has(n.id) : false
+      const radius = isH ? 14 : (isConn ? 11 : 8)
+      ctx.globalAlpha = hid ? (isH || isConn ? 1 : 0.3) : 1
+      if (isH) { ctx.beginPath(); ctx.arc(n.x, n.y, 20, 0, Math.PI * 2); ctx.fillStyle = n.color + '30'; ctx.fill() }
       ctx.beginPath(); ctx.arc(n.x, n.y, radius, 0, Math.PI * 2)
       ctx.fillStyle = n.color; ctx.fill()
       ctx.strokeStyle = isH ? '#ffffff' : '#c0c0c0'; ctx.lineWidth = isH ? 2.5 : 1; ctx.stroke()
-
-      // Label
-      ctx.fillStyle = isH || isConnected ? '#d4dae0' : '#6a7b8f'
-      ctx.font = (isH ? 'bold 11px' : '10px') + ' Arial'
-      ctx.textAlign = 'center'
-      const label = n.title.length > 32 ? n.title.slice(0, 32) + '...' : n.title
-      ctx.fillText(label, n.x, n.y + radius + 14)
+      ctx.fillStyle = isH || isConn ? '#d4dae0' : '#6a7b8f'
+      ctx.font = (isH ? 'bold 11px' : '10px') + ' Arial'; ctx.textAlign = 'center'
+      ctx.fillText(n.title.length > 32 ? n.title.slice(0, 32) + '...' : n.title, n.x, n.y + radius + 14)
       ctx.globalAlpha = 1
     }
 
     ctx.restore()
-
-    // Zoom indicator
     ctx.fillStyle = '#3a4555'; ctx.font = '10px monospace'; ctx.textAlign = 'right'
     ctx.fillText('Zoom: ' + Math.round(scale * 100) + '%  |  Scroll to zoom  |  Drag to pan', W - 10, H - 8)
-  }, [hoveredId])
+  }
 
-  useEffect(() => { draw() }, [hoveredId, draw])
-
-  // Transform screen coords to graph coords
   function screenToGraph(sx, sy) {
     const rect = canvasRef.current.getBoundingClientRect()
-    const canvasX = (sx - rect.left) * (800 / rect.width)
-    const canvasY = (sy - rect.top) * (640 / rect.height)
+    const cx = (sx - rect.left) * (800 / rect.width), cy = (sy - rect.top) * (640 / rect.height)
     const { x: vx, y: vy, scale } = viewRef.current
-    return { x: (canvasX - vx) / scale, y: (canvasY - vy) / scale }
+    return { x: (cx - vx) / scale, y: (cy - vy) / scale }
   }
 
   function findNode(e) {
@@ -242,52 +230,52 @@ function InteractiveGraph({ papers, clusters, rels, onSelect, colors }) {
     return nodesRef.current.find(n => Math.sqrt((n.x - x) ** 2 + (n.y - y) ** 2) < 16)
   }
 
+  function updateTooltip(e, node) {
+    const el = tooltipRef.current; if (!el) return
+    if (!node) { el.style.display = 'none'; return }
+    const rect = canvasRef.current.getBoundingClientRect()
+    const tx = Math.min(e.clientX - rect.left + 15, 520)
+    const ty = e.clientY - rect.top - 10
+    const connected = edgesRef.current.filter(ed => ed.source === node.id || ed.target === node.id)
+    let html = '<div style="font-size:13px;color:#e8e8e8;font-weight:bold;margin-bottom:6px;line-height:1.3">' + node.title + '</div>'
+    if (connected.length > 0) {
+      html += '<div style="font-size:10px;color:#7ec49e;font-family:monospace;margin-bottom:4px;text-transform:uppercase">Connected to:</div>'
+      connected.slice(0, 5).forEach(c => {
+        const otherId = c.source === node.id ? c.target : c.source
+        const other = nodesRef.current.find(nd => nd.id === otherId)
+        const title = other ? (other.title.length > 45 ? other.title.slice(0, 45) + '...' : other.title) : '?'
+        html += '<div style="margin-bottom:4px;padding-left:8px;border-left:2px solid #2a4a39"><div style="font-size:11px;color:#b0bac5;line-height:1.2">' + title + '</div><div style="font-size:9px;color:#5a6a7a;font-family:monospace">' + (c.reasons || []).slice(0, 2).join(' · ') + '</div></div>'
+      })
+      if (connected.length > 5) html += '<div style="font-size:10px;color:#4a5a6a;font-family:monospace">+' + (connected.length - 5) + ' more</div>'
+    } else {
+      html += '<div style="font-size:11px;color:#4a5a6a;font-family:monospace">No direct connections</div>'
+    }
+    el.innerHTML = html
+    el.style.display = 'block'; el.style.left = tx + 'px'; el.style.top = ty + 'px'
+  }
+
   function handleMouseMove(e) {
     if (dragRef.current.dragging) {
-      const rect = canvasRef.current.getBoundingClientRect()
-      const dx = (e.clientX - dragRef.current.startX) 
-      const dy = (e.clientY - dragRef.current.startY)
-      viewRef.current.x = dragRef.current.startViewX + dx
-      viewRef.current.y = dragRef.current.startViewY + dy
-      draw()
-      return
+      viewRef.current.x = dragRef.current.startViewX + (e.clientX - dragRef.current.startX)
+      viewRef.current.y = dragRef.current.startViewY + (e.clientY - dragRef.current.startY)
+      draw(); return
     }
     const n = findNode(e)
-    setHoveredId(n ? n.id : null)
+    const newId = n ? n.id : null
+    if (newId !== hoveredRef.current) { hoveredRef.current = newId; draw() }
     if (canvasRef.current) canvasRef.current.style.cursor = n ? 'pointer' : 'grab'
-
-    // Update tooltip
-    if (n) {
-      const connected = edgesRef.current.filter(ed => ed.source === n.id || ed.target === n.id)
-      const rect = canvasRef.current.getBoundingClientRect()
-      setTooltip({
-        x: e.clientX - rect.left + 15,
-        y: e.clientY - rect.top - 10,
-        title: n.title,
-        connections: connected.map(c => {
-          const otherId = c.source === n.id ? c.target : c.source
-          const other = nodesRef.current.find(nd => nd.id === otherId)
-          return { title: other?.title || '?', reasons: c.reasons || [] }
-        })
-      })
-    } else {
-      setTooltip(null)
-    }
+    updateTooltip(e, n)
   }
 
   function handleMouseDown(e) {
-    const n = findNode(e)
-    if (!n) {
+    if (!findNode(e)) {
       dragRef.current = { dragging: true, startX: e.clientX, startY: e.clientY, startViewX: viewRef.current.x, startViewY: viewRef.current.y }
       if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing'
     }
   }
 
   function handleMouseUp(e) {
-    if (!dragRef.current.dragging) {
-      const n = findNode(e)
-      if (n) onSelect(n.id)
-    }
+    if (!dragRef.current.dragging) { const n = findNode(e); if (n) onSelect(n.id) }
     dragRef.current.dragging = false
     if (canvasRef.current) canvasRef.current.style.cursor = 'grab'
   }
@@ -295,66 +283,27 @@ function InteractiveGraph({ papers, clusters, rels, onSelect, colors }) {
   function handleWheel(e) {
     e.preventDefault()
     const rect = canvasRef.current.getBoundingClientRect()
-    const mx = (e.clientX - rect.left) * (800 / rect.width)
-    const my = (e.clientY - rect.top) * (640 / rect.height)
+    const mx = (e.clientX - rect.left) * (800 / rect.width), my = (e.clientY - rect.top) * (640 / rect.height)
     const delta = e.deltaY > 0 ? 0.9 : 1.1
     const newScale = Math.max(0.3, Math.min(4, viewRef.current.scale * delta))
-    // Zoom toward mouse position
     viewRef.current.x = mx - (mx - viewRef.current.x) * (newScale / viewRef.current.scale)
     viewRef.current.y = my - (my - viewRef.current.y) * (newScale / viewRef.current.scale)
-    viewRef.current.scale = newScale
-    draw()
+    viewRef.current.scale = newScale; draw()
   }
 
   return (
     <div style={{ position: 'relative' }}>
       <canvas ref={canvasRef} width={800} height={640}
-        onMouseMove={handleMouseMove}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={() => { dragRef.current.dragging = false; setTooltip(null); setHoveredId(null) }}
+        onMouseMove={handleMouseMove} onMouseDown={handleMouseDown} onMouseUp={handleMouseUp}
+        onMouseLeave={() => { dragRef.current.dragging = false; hoveredRef.current = null; draw(); if (tooltipRef.current) tooltipRef.current.style.display = 'none' }}
         onWheel={handleWheel}
         style={{ width: '100%', maxWidth: 800, height: 'auto', borderRadius: 8, border: '1px solid var(--border)', cursor: 'grab' }} />
-
-      {/* Tooltip */}
-      {tooltip && (
-        <div style={{
-          position: 'absolute', left: Math.min(tooltip.x, 550), top: tooltip.y,
-          background: '#151d28', border: '1px solid #2a3545', borderRadius: 8,
-          padding: '10px 14px', maxWidth: 300, pointerEvents: 'none', zIndex: 10,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
-        }}>
-          <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 'bold', marginBottom: 6, lineHeight: 1.3 }}>{tooltip.title}</div>
-          {tooltip.connections.length > 0 ? (
-            <div>
-              <div style={{ fontSize: 10, color: 'var(--accent-green)', fontFamily: 'var(--mono)', marginBottom: 4, textTransform: 'uppercase' }}>Connected to:</div>
-              {tooltip.connections.slice(0, 5).map((c, i) => (
-                <div key={i} style={{ marginBottom: 4, paddingLeft: 8, borderLeft: '2px solid #2a4a39' }}>
-                  <div style={{ fontSize: 11, color: '#b0bac5', lineHeight: 1.2 }}>{c.title.length > 45 ? c.title.slice(0, 45) + '...' : c.title}</div>
-                  <div style={{ fontSize: 9, color: '#5a6a7a', fontFamily: 'var(--mono)' }}>{c.reasons.slice(0, 2).join(' · ')}</div>
-                </div>
-              ))}
-              {tooltip.connections.length > 5 && <div style={{ fontSize: 10, color: 'var(--text-faint)', fontFamily: 'var(--mono)' }}>+{tooltip.connections.length - 5} more</div>}
-            </div>
-          ) : (
-            <div style={{ fontSize: 11, color: 'var(--text-faint)', fontFamily: 'var(--mono)' }}>No direct connections</div>
-          )}
-        </div>
-      )}
-
-      {/* Legend */}
+      {/* Tooltip — updated via DOM ref, no React re-renders */}
+      <div ref={tooltipRef} style={{ display: 'none', position: 'absolute', background: '#151d28', border: '1px solid #2a3545', borderRadius: 8, padding: '10px 14px', maxWidth: 300, pointerEvents: 'none', zIndex: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }} />
       {clusters.length > 0 && (
         <div style={{ marginTop: 10, display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-faint)' }}>
-          {clusters.map((c, i) => (
-            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: colors[i % colors.length], display: 'inline-block' }} />
-              {c.name}
-            </span>
-          ))}
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3a4555', display: 'inline-block' }} />
-            Unclustered
-          </span>
+          {clusters.map((c, i) => <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: colors[i % colors.length], display: 'inline-block' }} />{c.name}</span>)}
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3a4555', display: 'inline-block' }} />Unclustered</span>
         </div>
       )}
     </div>

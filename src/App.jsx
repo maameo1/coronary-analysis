@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { PK, AK, ZUK, ZKK, GK, gid, ld, sv, genSummary, callAI, parseBib, parseCsv } from './utils'
 import Settings from './components/Settings'
 import DetailView from './components/DetailView'
@@ -31,9 +31,15 @@ export default function App() {
   const [zotL, setZotL] = useState(false)
   const [zotMsg, setZotMsg] = useState('')
 
+  // Debounced save — prevents lag during batch summarization
+  const saveTimer = useRef(null)
   useEffect(() => {
-    try { sv(PK, papers) }
-    catch (e) { console.warn('Storage save failed — library may be too large for localStorage:', e) }
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => {
+      try { sv(PK, papers) }
+      catch (e) { console.warn('Storage save failed:', e) }
+    }, 500)
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
   }, [papers])
   useEffect(() => { if (gap) sv(GK, gap) }, [gap])
 
@@ -168,15 +174,15 @@ export default function App() {
 
   const [showStarred, setShowStarred] = useState(false)
 
-  const allTags = [...new Set(papers.flatMap(p => p.summary?.tags || []))]
-  const filtered = papers.filter(p => {
+  const allTags = useMemo(() => [...new Set(papers.flatMap(p => p.summary?.tags || []))], [papers])
+  const filtered = useMemo(() => papers.filter(p => {
     const ms = !search || p.title?.toLowerCase().includes(search.toLowerCase()) || p.summary?.tldr?.toLowerCase().includes(search.toLowerCase()) || p.authors?.some(a => a.toLowerCase().includes(search.toLowerCase()))
     const tagMatch = filterTags.length === 0 || filterTags.some(t => p.summary?.tags?.includes(t))
     const starMatch = !showStarred || p.starred
     const readMatch = readFilter === 'all' || (readFilter === 'read' && p.readStatus === 'read') || (readFilter === 'unread' && p.readStatus !== 'read')
     return ms && tagMatch && starMatch && readMatch
-  })
-  const unsum = papers.filter(p => !p.summary).length
+  }), [papers, search, filterTags, showStarred, readFilter])
+  const unsum = useMemo(() => papers.filter(p => !p.summary).length, [papers])
 
   // ── Shared header + nav ────────────────────────────────────────────────
   const headerEl = (
