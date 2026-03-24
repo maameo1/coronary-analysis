@@ -93,8 +93,7 @@ export default function App() {
     try {
       let start = 0, all = []
       while (true) {
-        const url = 'https://api.zotero.org/users/' + zUid + '/items?format=json&limit=50&start=' + start + '&sort=dateModified&direction=desc'
-        const r = await fetch(url, { headers: { 'Zotero-API-Key': zKey, 'Zotero-API-Version': '3' } })
+        const r = await fetch('https://api.zotero.org/users/' + zUid + '/items?format=json&limit=50&start=' + start + '&sort=dateModified&direction=desc', { headers: { 'Zotero-API-Key': zKey, 'Zotero-API-Version': '3' } })
         if (!r.ok) {
           if (r.status === 403) throw new Error('Zotero 403 Forbidden - check your API key has read access')
           if (r.status === 404) throw new Error('Zotero 404 - check your User ID is correct')
