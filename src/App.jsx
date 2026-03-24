@@ -16,7 +16,8 @@ export default function App() {
   const [loadingMsg, setLoadingMsg] = useState('')
   const [selected, setSelected] = useState(null)
   const [search, setSearch] = useState('')
-  const [filterTag, setFilterTag] = useState(null)
+  const [filterTags, setFilterTags] = useState([])
+  const [readFilter, setReadFilter] = useState('all') // all | read | unread
   const [tab, setTab] = useState('library')
   const [error, setError] = useState(null)
   const [pdf, setPdf] = useState(null)
@@ -81,26 +82,39 @@ export default function App() {
   }
 
   async function zotImp() {
-    if (!zUid || !zKey) { setError('Add Zotero credentials in ⚙'); return }
-    setZotL(true); setZotMsg('Connecting...'); setError(null)
+    if (!zUid || !zKey) { setError('Add Zotero credentials in Settings'); return }
+    setZotL(true); setZotMsg('Connecting to Zotero...'); setError(null)
     try {
       let start = 0, all = []
       while (true) {
-        const r = await fetch('https://api.zotero.org/users/' + zUid + '/items?format=json&itemType=-attachment%20||%20note&limit=50&start=' + start + '&sort=dateModified&direction=desc', { headers: { 'Zotero-API-Key': zKey, 'Zotero-API-Version': '3' } })
-        if (!r.ok) throw new Error('Zotero error ' + r.status)
+        const url = 'https://api.zotero.org/users/' + zUid + '/items?format=json&limit=50&start=' + start + '&sort=dateModified&direction=desc'
+        const r = await fetch(url, { headers: { 'Zotero-API-Key': zKey, 'Zotero-API-Version': '3' } })
+        if (!r.ok) {
+          if (r.status === 403) throw new Error('Zotero 403 Forbidden - check your API key has read access')
+          if (r.status === 404) throw new Error('Zotero 404 - check your User ID is correct')
+          throw new Error('Zotero error ' + r.status)
+        }
         const items = await r.json(); if (!items.length) break
-        all = [...all, ...items]; setZotMsg('Found ' + all.length + '...')
+        all = [...all, ...items]; setZotMsg('Found ' + all.length + ' items...')
         if (items.length < 50 || all.length > 500) break; start += 50
       }
-      const types = new Set(['journalArticle', 'conferencePaper', 'preprint', 'book', 'bookSection', 'thesis', 'report'])
+      // Filter to paper types locally (more reliable than API filter)
+      const types = new Set(['journalArticle', 'conferencePaper', 'preprint', 'book', 'bookSection', 'thesis', 'report', 'manuscript', 'document'])
       const zi = all.filter(i => types.has(i.data?.itemType))
-      const ex = new Set(papers.map(p => p.title?.toLowerCase())); const nw = []
+      setZotMsg('Found ' + zi.length + ' papers out of ' + all.length + ' items. Checking duplicates...')
+      
+      const ex = new Set(papers.map(p => p.title?.toLowerCase().trim())); const nw = []
+      let skipped = 0
       for (const item of zi) {
-        const d = item.data; if (!d.title || ex.has(d.title.toLowerCase())) continue; ex.add(d.title.toLowerCase())
-        nw.push({ id: gid(), title: d.title, authors: (d.creators || []).filter(c => c.creatorType === 'author').map(c => ((c.firstName || '') + ' ' + (c.lastName || '')).trim()), abstract: d.abstractNote || '', published: d.date || '', venue: d.publicationTitle || d.proceedingsTitle || d.bookTitle || '', source: 'Zotero', sourceId: d.DOI || d.key, url: d.url || '', summary: null, addedAt: new Date().toISOString(), notes: '', readStatus: 'unread', figure: null, schematic: null })
+        const d = item.data
+        if (!d.title) continue
+        if (ex.has(d.title.toLowerCase().trim())) { skipped++; continue }
+        ex.add(d.title.toLowerCase().trim())
+        nw.push({ id: gid(), title: d.title, authors: (d.creators || []).filter(c => c.creatorType === 'author').map(c => ((c.firstName || '') + ' ' + (c.lastName || '')).trim()), abstract: d.abstractNote || '', published: d.date || '', venue: d.publicationTitle || d.proceedingsTitle || d.bookTitle || '', source: 'Zotero', sourceId: d.DOI || d.key, url: d.url || '', summary: null, addedAt: new Date().toISOString(), notes: '', readStatus: 'unread', figure: null, schematic: null, starred: false })
       }
       if (nw.length) setPapers(prev => [...nw, ...prev])
-      setZotMsg('Imported ' + nw.length + ' papers.'); setTimeout(() => setZotMsg(''), 8000)
+      setZotMsg('Imported ' + nw.length + ' new papers' + (skipped > 0 ? ' (' + skipped + ' duplicates skipped)' : '') + '. Total library: ' + (papers.length + nw.length))
+      setTimeout(() => setZotMsg(''), 10000)
     } catch (err) { setError('Zotero failed: ' + err.message) }
     finally { setZotL(false) }
   }
@@ -157,9 +171,10 @@ export default function App() {
   const allTags = [...new Set(papers.flatMap(p => p.summary?.tags || []))]
   const filtered = papers.filter(p => {
     const ms = !search || p.title?.toLowerCase().includes(search.toLowerCase()) || p.summary?.tldr?.toLowerCase().includes(search.toLowerCase()) || p.authors?.some(a => a.toLowerCase().includes(search.toLowerCase()))
-    const tagMatch = !filterTag || p.summary?.tags?.includes(filterTag)
+    const tagMatch = filterTags.length === 0 || filterTags.some(t => p.summary?.tags?.includes(t))
     const starMatch = !showStarred || p.starred
-    return ms && tagMatch && starMatch
+    const readMatch = readFilter === 'all' || (readFilter === 'read' && p.readStatus === 'read') || (readFilter === 'unread' && p.readStatus !== 'read')
+    return ms && tagMatch && starMatch && readMatch
   })
   const unsum = papers.filter(p => !p.summary).length
 
@@ -204,5 +219,5 @@ export default function App() {
     return (<div>{headerEl}<GapView papers={papers} gap={gap} gapL={gapL} onRunGap={runGap} />{settingsEl}</div>)
   }
 
-  return (<div>{headerEl}<LibraryView papers={papers} filtered={filtered} allTags={allTags} filterTag={filterTag} setFilterTag={setFilterTag} search={search} setSearch={setSearch} unsum={unsum} sumL={sumL} loadingMsg={loadingMsg} onSumAll={sumAll} onSelect={p => { setSelected(p); setTab('detail') }} onToggleStar={togStar} showStarred={showStarred} setShowStarred={setShowStarred} />{settingsEl}</div>)
+  return (<div>{headerEl}<LibraryView papers={papers} filtered={filtered} allTags={allTags} filterTags={filterTags} setFilterTags={setFilterTags} readFilter={readFilter} setReadFilter={setReadFilter} search={search} setSearch={setSearch} unsum={unsum} sumL={sumL} loadingMsg={loadingMsg} onSumAll={sumAll} onSelect={p => { setSelected(p); setTab('detail') }} onToggleStar={togStar} showStarred={showStarred} setShowStarred={setShowStarred} />{settingsEl}</div>)
 }

@@ -1,11 +1,12 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import { gtc, tagStyle, computeRelationships, computeClusters } from '../utils'
 
 export default function GraphView({ papers, onSelect }) {
   const withSummary = papers.filter(p => p.summary)
   const rels = computeRelationships(withSummary)
   const { clusters, bridges } = withSummary.length >= 2 ? computeClusters(withSummary, rels) : { clusters: [], bridges: [] }
-  const [activeTab, setActiveTab] = useState('clusters') // clusters | connections | graph
+  const [activeTab, setActiveTab] = useState('clusters')
+  const COLORS = ['#5b8a72', '#7eb8da', '#9070c4', '#c49070', '#c4c470', '#c47070', '#7ec4c4', '#c490d1']
 
   if (withSummary.length < 2) {
     return (
@@ -21,154 +22,123 @@ export default function GraphView({ papers, onSelect }) {
     border: '1px solid ' + (active ? 'var(--border)' : 'transparent'), borderRadius: 6,
   })
 
-  const CLUSTER_COLORS = ['#5b8a72', '#7eb8da', '#9070c4', '#c49070', '#c4c470', '#c47070', '#7ec4c4', '#c490d1']
-
   return (
     <div style={{ padding: '20px 32px' }}>
       <h2 style={{ fontSize: 18, color: 'var(--text-primary)', fontWeight: 400, margin: '0 0 16px' }}>Paper Relationships</h2>
-
-      {/* Sub-tabs */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
         <span onClick={() => setActiveTab('clusters')} style={tabStyle(activeTab === 'clusters')}>Clusters ({clusters.length})</span>
         <span onClick={() => setActiveTab('connections')} style={tabStyle(activeTab === 'connections')}>Connections ({rels.length})</span>
-        <span onClick={() => setActiveTab('graph')} style={tabStyle(activeTab === 'graph')}>Visual Graph</span>
+        <span onClick={() => setActiveTab('graph')} style={tabStyle(activeTab === 'graph')}>Interactive Graph</span>
       </div>
 
-      {/* Clusters Tab */}
-      {activeTab === 'clusters' && (
-        <div>
-          {clusters.length === 0 ? (
-            <div style={{ fontSize: 13, color: 'var(--text-faint)', fontFamily: 'var(--mono)', padding: 40, textAlign: 'center' }}>No clusters detected. Papers may need more overlapping tags or methods.</div>
-          ) : (
-            <>
-              {clusters.map((cluster, ci) => (
-                <div key={ci} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 22px', marginBottom: 16 }}>
-                  {/* Cluster header */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: CLUSTER_COLORS[ci % CLUSTER_COLORS.length], flexShrink: 0 }} />
-                    <h3 style={{ fontSize: 15, color: 'var(--text-primary)', fontWeight: 400, margin: 0, flex: 1 }}>{cluster.name}</h3>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--mono)' }}>{cluster.size} papers</span>
-                  </div>
+      {activeTab === 'clusters' && <ClustersTab clusters={clusters} bridges={bridges} withSummary={withSummary} onSelect={onSelect} colors={COLORS} />}
+      {activeTab === 'connections' && <ConnectionsTab rels={rels} onSelect={onSelect} />}
+      {activeTab === 'graph' && <InteractiveGraph papers={withSummary} clusters={clusters} rels={rels} onSelect={onSelect} colors={COLORS} />}
+    </div>
+  )
+}
 
-                  {/* Tags */}
-                  {cluster.tags.length > 0 && (
-                    <div style={{ marginBottom: 10 }}>
-                      {cluster.tags.map(t => <span key={t} style={tagStyle(t)}>{t}</span>)}
-                    </div>
-                  )}
+// ── Clusters Tab ─────────────────────────────────────────────────────────
+function ClustersTab({ clusters, bridges, withSummary, onSelect, colors }) {
+  if (clusters.length === 0) {
+    return <div style={{ fontSize: 13, color: 'var(--text-faint)', fontFamily: 'var(--mono)', padding: 40, textAlign: 'center' }}>No clusters detected yet.</div>
+  }
+  const clusteredIds = new Set(clusters.flatMap(c => c.papers.map(p => p.id)))
+  const unclustered = withSummary.filter(p => !clusteredIds.has(p.id))
 
-                  {/* Why grouped */}
-                  {cluster.reasons.length > 0 && (
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--mono)', marginBottom: 12, padding: '6px 10px', background: 'var(--bg-primary)', borderRadius: 4 }}>
-                      Grouped by: {cluster.reasons.slice(0, 4).join(' · ')}
-                    </div>
-                  )}
-
-                  {/* Papers in cluster */}
-                  {cluster.papers.map(p => (
-                    <div key={p.id} onClick={() => onSelect(p.id)} style={{ padding: '8px 12px', marginBottom: 4, borderRadius: 6, cursor: 'pointer', borderLeft: '3px solid ' + CLUSTER_COLORS[ci % CLUSTER_COLORS.length] + '44', transition: 'background 0.15s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#1a2030'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                      <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.3 }}>
-                        {p.starred && <span style={{ color: '#c4c470', marginRight: 4 }}>★</span>}
-                        {p.title}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-faint)', fontFamily: 'var(--mono)', marginTop: 2 }}>
-                        {(p.authors || []).slice(0, 2).join(', ')}{(p.authors || []).length > 2 ? ' et al.' : ''} · {p.published}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-
-              {/* Bridge papers */}
-              {bridges.length > 0 && (
-                <div style={{ marginTop: 20 }}>
-                  <h3 style={{ fontSize: 14, color: 'var(--accent-purple)', fontWeight: 400, margin: '0 0 12px', fontFamily: 'var(--mono)' }}>Bridge Papers (connecting multiple clusters)</h3>
-                  {bridges.map((b, i) => (
-                    <div key={i} onClick={() => onSelect(b.paper.id)} style={{ background: 'var(--bg-secondary)', border: '1px solid #2a2535', borderRadius: 8, padding: '10px 14px', marginBottom: 6, cursor: 'pointer' }}>
-                      <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{b.paper.title}</div>
-                      <div style={{ fontSize: 11, color: '#9070c4', fontFamily: 'var(--mono)', marginTop: 4 }}>Connects: {b.clusters.join(' ↔ ')}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Unclustered papers */}
-              {(() => {
-                const clusteredIds = new Set(clusters.flatMap(c => c.papers.map(p => p.id)))
-                const unclustered = withSummary.filter(p => !clusteredIds.has(p.id))
-                if (unclustered.length === 0) return null
-                return (
-                  <div style={{ marginTop: 20 }}>
-                    <h3 style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 400, margin: '0 0 12px', fontFamily: 'var(--mono)' }}>Unclustered ({unclustered.length})</h3>
-                    {unclustered.map(p => (
-                      <div key={p.id} onClick={() => onSelect(p.id)} style={{ padding: '6px 12px', fontSize: 13, color: 'var(--text-faint)', cursor: 'pointer', marginBottom: 4 }}
-                        onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
-                        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-faint)'}>
-                        {p.title}
-                      </div>
-                    ))}
-                  </div>
-                )
-              })()}
-            </>
-          )}
+  return (
+    <div>
+      {clusters.map((cluster, ci) => (
+        <div key={ci} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 22px', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            <div style={{ width: 12, height: 12, borderRadius: '50%', background: colors[ci % colors.length], flexShrink: 0 }} />
+            <h3 style={{ fontSize: 15, color: 'var(--text-primary)', fontWeight: 400, margin: 0, flex: 1 }}>{cluster.name}</h3>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--mono)' }}>{cluster.size} papers</span>
+          </div>
+          {cluster.tags.length > 0 && <div style={{ marginBottom: 10 }}>{cluster.tags.map(t => <span key={t} style={tagStyle(t)}>{t}</span>)}</div>}
+          {cluster.reasons.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--mono)', marginBottom: 12, padding: '6px 10px', background: 'var(--bg-primary)', borderRadius: 4 }}>Grouped by: {cluster.reasons.slice(0, 4).join(' · ')}</div>}
+          {cluster.papers.map(p => (
+            <div key={p.id} onClick={() => onSelect(p.id)} style={{ padding: '8px 12px', marginBottom: 4, borderRadius: 6, cursor: 'pointer', borderLeft: '3px solid ' + colors[ci % colors.length] + '44' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#1a2030'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.3 }}>{p.starred && <span style={{ color: '#c4c470', marginRight: 4 }}>★</span>}{p.title}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-faint)', fontFamily: 'var(--mono)', marginTop: 2 }}>{(p.authors || []).slice(0, 2).join(', ')}{(p.authors || []).length > 2 ? ' et al.' : ''} · {p.published}</div>
+            </div>
+          ))}
         </div>
-      )}
-
-      {/* Connections Tab */}
-      {activeTab === 'connections' && (
-        <div>
-          {rels.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-faint)', fontFamily: 'var(--mono)', padding: 40, textAlign: 'center' }}>No connections found.</div>}
-          {rels.slice(0, 30).map((r, i) => (
-            <div key={i} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px', marginBottom: 8 }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
-                <span style={{ fontSize: 13, color: 'var(--text-primary)', flex: 1, cursor: 'pointer' }} onClick={() => onSelect(r.a)}>{r.aTitle?.length > 50 ? r.aTitle.slice(0, 50) + '...' : r.aTitle}</span>
-                <span style={{ fontSize: 11, color: 'var(--accent-green)', fontFamily: 'var(--mono)', flexShrink: 0 }}>↔</span>
-                <span style={{ fontSize: 13, color: 'var(--text-primary)', flex: 1, cursor: 'pointer', textAlign: 'right' }} onClick={() => onSelect(r.b)}>{r.bTitle?.length > 50 ? r.bTitle.slice(0, 50) + '...' : r.bTitle}</span>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--mono)' }}>{r.reasons.join(' · ')}</div>
+      ))}
+      {bridges.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <h3 style={{ fontSize: 14, color: 'var(--accent-purple)', fontWeight: 400, margin: '0 0 12px', fontFamily: 'var(--mono)' }}>Bridge Papers</h3>
+          {bridges.map((b, i) => (
+            <div key={i} onClick={() => onSelect(b.paper.id)} style={{ background: 'var(--bg-secondary)', border: '1px solid #2a2535', borderRadius: 8, padding: '10px 14px', marginBottom: 6, cursor: 'pointer' }}>
+              <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{b.paper.title}</div>
+              <div style={{ fontSize: 11, color: '#9070c4', fontFamily: 'var(--mono)', marginTop: 4 }}>Connects: {b.clusters.join(' ↔ ')}</div>
             </div>
           ))}
         </div>
       )}
-
-      {/* Graph Tab */}
-      {activeTab === 'graph' && (
-        <RelCanvas papers={withSummary} clusters={clusters} onSelect={onSelect} />
+      {unclustered.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <h3 style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 400, margin: '0 0 12px', fontFamily: 'var(--mono)' }}>Unclustered ({unclustered.length})</h3>
+          {unclustered.map(p => (
+            <div key={p.id} onClick={() => onSelect(p.id)} style={{ padding: '6px 12px', fontSize: 13, color: 'var(--text-faint)', cursor: 'pointer', marginBottom: 4 }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-faint)'}>{p.title}</div>
+          ))}
+        </div>
       )}
     </div>
   )
 }
 
-function RelCanvas({ papers, clusters, onSelect }) {
+// ── Connections Tab ───────────────────────────────────────────────────────
+function ConnectionsTab({ rels, onSelect }) {
+  if (rels.length === 0) return <div style={{ fontSize: 13, color: 'var(--text-faint)', fontFamily: 'var(--mono)', padding: 40, textAlign: 'center' }}>No connections found.</div>
+  return (
+    <div>
+      {rels.slice(0, 30).map((r, i) => (
+        <div key={i} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px', marginBottom: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ fontSize: 13, color: 'var(--text-primary)', flex: 1, cursor: 'pointer' }} onClick={() => onSelect(r.a)}>{r.aTitle?.length > 50 ? r.aTitle.slice(0, 50) + '...' : r.aTitle}</span>
+            <span style={{ fontSize: 11, color: 'var(--accent-green)', fontFamily: 'var(--mono)', flexShrink: 0 }}>↔</span>
+            <span style={{ fontSize: 13, color: 'var(--text-primary)', flex: 1, cursor: 'pointer', textAlign: 'right' }} onClick={() => onSelect(r.b)}>{r.bTitle?.length > 50 ? r.bTitle.slice(0, 50) + '...' : r.bTitle}</span>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--mono)' }}>{r.reasons.join(' · ')}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Interactive Graph with Zoom + Pan + Tooltips ─────────────────────────
+function InteractiveGraph({ papers, clusters, rels, onSelect, colors }) {
   const canvasRef = useRef(null)
   const nodesRef = useRef([])
   const edgesRef = useRef([])
-  const [hovered, setHovered] = useState(null)
-  const COLORS = ['#5b8a72', '#7eb8da', '#9070c4', '#c49070', '#c4c470', '#c47070', '#7ec4c4', '#c490d1']
+  const viewRef = useRef({ x: 0, y: 0, scale: 1 })
+  const dragRef = useRef({ dragging: false, startX: 0, startY: 0, startViewX: 0, startViewY: 0 })
+  const [tooltip, setTooltip] = useState(null)
+  const [hoveredId, setHoveredId] = useState(null)
 
+  // Build cluster color map
+  const clusterMap = {}
+  clusters.forEach((c, ci) => { c.papers.forEach(p => { clusterMap[p.id] = ci }) })
+
+  // Initialize nodes and run force simulation
   useEffect(() => {
-    const rels = computeRelationships(papers)
-    // Assign cluster colors
-    const clusterMap = {}
-    clusters.forEach((c, ci) => { c.papers.forEach(p => { clusterMap[p.id] = ci }) })
-
     const nodes = papers.map((p, i) => {
       const angle = (2 * Math.PI * i) / papers.length
-      const r = Math.min(250, papers.length * 18)
+      const r = Math.min(280, papers.length * 20)
       const ci = clusterMap[p.id]
-      return { id: p.id, title: p.title, color: ci !== undefined ? COLORS[ci % COLORS.length] : '#3a4555', x: 400 + r * Math.cos(angle), y: 300 + r * Math.sin(angle), vx: 0, vy: 0 }
+      return { id: p.id, title: p.title, tags: p.summary?.tags || [], color: ci !== undefined ? colors[ci % colors.length] : '#3a4555', x: 400 + r * Math.cos(angle), y: 320 + r * Math.sin(angle), vx: 0, vy: 0 }
     })
-    const edges = rels.filter(r => r.strength >= 1).map(r => ({ source: r.a, target: r.b, strength: r.strength }))
+    const edges = rels.filter(r => r.strength >= 1).map(r => ({ source: r.a, target: r.b, strength: r.strength, reasons: r.reasons }))
 
-    for (let iter = 0; iter < 120; iter++) {
+    for (let iter = 0; iter < 150; iter++) {
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
           const dx = nodes[j].x - nodes[i].x, dy = nodes[j].y - nodes[i].y
           const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1)
-          const f = 800 / (dist * dist)
+          const f = 1000 / (dist * dist)
           nodes[i].vx -= (dx / dist) * f; nodes[i].vy -= (dy / dist) * f
           nodes[j].vx += (dx / dist) * f; nodes[j].vy += (dy / dist) * f
         }
@@ -177,52 +147,216 @@ function RelCanvas({ papers, clusters, onSelect }) {
         const s = nodes.find(n => n.id === e.source), t = nodes.find(n => n.id === e.target)
         if (!s || !t) continue
         const dx = t.x - s.x, dy = t.y - s.y, dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1)
-        const f = (dist - 150) * 0.01 * e.strength
+        const f = (dist - 160) * 0.01 * e.strength
         s.vx += (dx / dist) * f; s.vy += (dy / dist) * f
         t.vx -= (dx / dist) * f; t.vy -= (dy / dist) * f
       }
       for (const n of nodes) {
-        n.vx += (400 - n.x) * 0.01; n.vy += (300 - n.y) * 0.01
-        n.x += n.vx * 0.3; n.y += n.vy * 0.3; n.vx *= 0.8; n.vy *= 0.8
-        n.x = Math.max(40, Math.min(760, n.x)); n.y = Math.max(40, Math.min(560, n.y))
+        n.vx += (400 - n.x) * 0.008; n.vy += (320 - n.y) * 0.008
+        n.x += n.vx * 0.3; n.y += n.vy * 0.3; n.vx *= 0.75; n.vy *= 0.75
       }
     }
-    nodesRef.current = nodes; edgesRef.current = edges; draw()
+    nodesRef.current = nodes; edgesRef.current = edges
+    viewRef.current = { x: 0, y: 0, scale: 1 }
+    draw()
   }, [papers, clusters])
 
-  function draw() {
+  const draw = useCallback(() => {
     const canvas = canvasRef.current; if (!canvas) return
     const ctx = canvas.getContext('2d')
+    const W = 800, H = 640
+    const { x: vx, y: vy, scale } = viewRef.current
     const nodes = nodesRef.current, edges = edgesRef.current
-    ctx.clearRect(0, 0, 800, 600); ctx.fillStyle = '#0a0e13'; ctx.fillRect(0, 0, 800, 600)
+
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = '#0a0e13'; ctx.fillRect(0, 0, W, H)
+
+    ctx.save()
+    ctx.translate(vx, vy)
+    ctx.scale(scale, scale)
+
+    // Draw edges
     for (const e of edges) {
       const s = nodes.find(n => n.id === e.source), t = nodes.find(n => n.id === e.target)
       if (!s || !t) continue
+      const isHighlighted = hoveredId && (e.source === hoveredId || e.target === hoveredId)
       ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(t.x, t.y)
-      ctx.strokeStyle = e.strength >= 3 ? '#2a5a3a' : e.strength >= 2 ? '#1e3a2e' : '#162520'
-      ctx.lineWidth = Math.min(e.strength, 3); ctx.stroke()
-    }
-    for (const n of nodes) {
-      const isH = hovered === n.id
-      ctx.beginPath(); ctx.arc(n.x, n.y, isH ? 12 : 8, 0, Math.PI * 2)
-      ctx.fillStyle = n.color; ctx.fill()
-      ctx.strokeStyle = isH ? '#ffffff' : '#e8e8e8'; ctx.lineWidth = isH ? 2 : 1; ctx.stroke()
-      ctx.fillStyle = '#8a9bb5'; ctx.font = '10px monospace'; ctx.textAlign = 'center'
-      ctx.fillText(n.title.length > 28 ? n.title.slice(0, 28) + '...' : n.title, n.x, n.y + 20)
-    }
-  }
+      ctx.strokeStyle = isHighlighted ? '#4a8a5a' : (e.strength >= 3 ? '#2a5a3a' : e.strength >= 2 ? '#1e3a2e' : '#162520')
+      ctx.lineWidth = isHighlighted ? Math.min(e.strength + 1, 4) : Math.min(e.strength, 3)
+      ctx.stroke()
 
-  useEffect(() => { draw() }, [hovered])
+      // Draw edge label if highlighted
+      if (isHighlighted && e.reasons) {
+        const mx = (s.x + t.x) / 2, my = (s.y + t.y) / 2
+        ctx.fillStyle = '#6a8a7a'; ctx.font = '8px Arial'; ctx.textAlign = 'center'
+        ctx.fillText(e.reasons[0] || '', mx, my - 4)
+      }
+    }
+
+    // Draw nodes
+    for (const n of nodes) {
+      const isH = hoveredId === n.id
+      const isConnected = hoveredId && edges.some(e => (e.source === hoveredId && e.target === n.id) || (e.target === hoveredId && e.source === n.id))
+      const radius = isH ? 14 : (isConnected ? 11 : 8)
+      const alpha = hoveredId ? (isH || isConnected ? 1 : 0.3) : 1
+
+      ctx.globalAlpha = alpha
+      // Glow for hovered
+      if (isH) {
+        ctx.beginPath(); ctx.arc(n.x, n.y, 20, 0, Math.PI * 2)
+        ctx.fillStyle = n.color + '30'; ctx.fill()
+      }
+      ctx.beginPath(); ctx.arc(n.x, n.y, radius, 0, Math.PI * 2)
+      ctx.fillStyle = n.color; ctx.fill()
+      ctx.strokeStyle = isH ? '#ffffff' : '#c0c0c0'; ctx.lineWidth = isH ? 2.5 : 1; ctx.stroke()
+
+      // Label
+      ctx.fillStyle = isH || isConnected ? '#d4dae0' : '#6a7b8f'
+      ctx.font = (isH ? 'bold 11px' : '10px') + ' Arial'
+      ctx.textAlign = 'center'
+      const label = n.title.length > 32 ? n.title.slice(0, 32) + '...' : n.title
+      ctx.fillText(label, n.x, n.y + radius + 14)
+      ctx.globalAlpha = 1
+    }
+
+    ctx.restore()
+
+    // Zoom indicator
+    ctx.fillStyle = '#3a4555'; ctx.font = '10px monospace'; ctx.textAlign = 'right'
+    ctx.fillText('Zoom: ' + Math.round(scale * 100) + '%  |  Scroll to zoom  |  Drag to pan', W - 10, H - 8)
+  }, [hoveredId])
+
+  useEffect(() => { draw() }, [hoveredId, draw])
+
+  // Transform screen coords to graph coords
+  function screenToGraph(sx, sy) {
+    const rect = canvasRef.current.getBoundingClientRect()
+    const canvasX = (sx - rect.left) * (800 / rect.width)
+    const canvasY = (sy - rect.top) * (640 / rect.height)
+    const { x: vx, y: vy, scale } = viewRef.current
+    return { x: (canvasX - vx) / scale, y: (canvasY - vy) / scale }
+  }
 
   function findNode(e) {
     if (!canvasRef.current) return null
-    const rect = canvasRef.current.getBoundingClientRect()
-    const mx = (e.clientX - rect.left) * (800 / rect.width), my = (e.clientY - rect.top) * (600 / rect.height)
-    return nodesRef.current.find(n => Math.sqrt((n.x - mx) ** 2 + (n.y - my) ** 2) < 14)
+    const { x, y } = screenToGraph(e.clientX, e.clientY)
+    return nodesRef.current.find(n => Math.sqrt((n.x - x) ** 2 + (n.y - y) ** 2) < 16)
   }
 
-  return <canvas ref={canvasRef} width={800} height={600}
-    onMouseMove={e => { const n = findNode(e); setHovered(n ? n.id : null); if (canvasRef.current) canvasRef.current.style.cursor = n ? 'pointer' : 'default' }}
-    onClick={e => { const n = findNode(e); if (n) onSelect(n.id) }}
-    style={{ width: '100%', maxWidth: 800, height: 'auto', borderRadius: 8, border: '1px solid var(--border)' }} />
+  function handleMouseMove(e) {
+    if (dragRef.current.dragging) {
+      const rect = canvasRef.current.getBoundingClientRect()
+      const dx = (e.clientX - dragRef.current.startX) 
+      const dy = (e.clientY - dragRef.current.startY)
+      viewRef.current.x = dragRef.current.startViewX + dx
+      viewRef.current.y = dragRef.current.startViewY + dy
+      draw()
+      return
+    }
+    const n = findNode(e)
+    setHoveredId(n ? n.id : null)
+    if (canvasRef.current) canvasRef.current.style.cursor = n ? 'pointer' : 'grab'
+
+    // Update tooltip
+    if (n) {
+      const connected = edgesRef.current.filter(ed => ed.source === n.id || ed.target === n.id)
+      const rect = canvasRef.current.getBoundingClientRect()
+      setTooltip({
+        x: e.clientX - rect.left + 15,
+        y: e.clientY - rect.top - 10,
+        title: n.title,
+        connections: connected.map(c => {
+          const otherId = c.source === n.id ? c.target : c.source
+          const other = nodesRef.current.find(nd => nd.id === otherId)
+          return { title: other?.title || '?', reasons: c.reasons || [] }
+        })
+      })
+    } else {
+      setTooltip(null)
+    }
+  }
+
+  function handleMouseDown(e) {
+    const n = findNode(e)
+    if (!n) {
+      dragRef.current = { dragging: true, startX: e.clientX, startY: e.clientY, startViewX: viewRef.current.x, startViewY: viewRef.current.y }
+      if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing'
+    }
+  }
+
+  function handleMouseUp(e) {
+    if (!dragRef.current.dragging) {
+      const n = findNode(e)
+      if (n) onSelect(n.id)
+    }
+    dragRef.current.dragging = false
+    if (canvasRef.current) canvasRef.current.style.cursor = 'grab'
+  }
+
+  function handleWheel(e) {
+    e.preventDefault()
+    const rect = canvasRef.current.getBoundingClientRect()
+    const mx = (e.clientX - rect.left) * (800 / rect.width)
+    const my = (e.clientY - rect.top) * (640 / rect.height)
+    const delta = e.deltaY > 0 ? 0.9 : 1.1
+    const newScale = Math.max(0.3, Math.min(4, viewRef.current.scale * delta))
+    // Zoom toward mouse position
+    viewRef.current.x = mx - (mx - viewRef.current.x) * (newScale / viewRef.current.scale)
+    viewRef.current.y = my - (my - viewRef.current.y) * (newScale / viewRef.current.scale)
+    viewRef.current.scale = newScale
+    draw()
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <canvas ref={canvasRef} width={800} height={640}
+        onMouseMove={handleMouseMove}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={() => { dragRef.current.dragging = false; setTooltip(null); setHoveredId(null) }}
+        onWheel={handleWheel}
+        style={{ width: '100%', maxWidth: 800, height: 'auto', borderRadius: 8, border: '1px solid var(--border)', cursor: 'grab' }} />
+
+      {/* Tooltip */}
+      {tooltip && (
+        <div style={{
+          position: 'absolute', left: Math.min(tooltip.x, 550), top: tooltip.y,
+          background: '#151d28', border: '1px solid #2a3545', borderRadius: 8,
+          padding: '10px 14px', maxWidth: 300, pointerEvents: 'none', zIndex: 10,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+        }}>
+          <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 'bold', marginBottom: 6, lineHeight: 1.3 }}>{tooltip.title}</div>
+          {tooltip.connections.length > 0 ? (
+            <div>
+              <div style={{ fontSize: 10, color: 'var(--accent-green)', fontFamily: 'var(--mono)', marginBottom: 4, textTransform: 'uppercase' }}>Connected to:</div>
+              {tooltip.connections.slice(0, 5).map((c, i) => (
+                <div key={i} style={{ marginBottom: 4, paddingLeft: 8, borderLeft: '2px solid #2a4a39' }}>
+                  <div style={{ fontSize: 11, color: '#b0bac5', lineHeight: 1.2 }}>{c.title.length > 45 ? c.title.slice(0, 45) + '...' : c.title}</div>
+                  <div style={{ fontSize: 9, color: '#5a6a7a', fontFamily: 'var(--mono)' }}>{c.reasons.slice(0, 2).join(' · ')}</div>
+                </div>
+              ))}
+              {tooltip.connections.length > 5 && <div style={{ fontSize: 10, color: 'var(--text-faint)', fontFamily: 'var(--mono)' }}>+{tooltip.connections.length - 5} more</div>}
+            </div>
+          ) : (
+            <div style={{ fontSize: 11, color: 'var(--text-faint)', fontFamily: 'var(--mono)' }}>No direct connections</div>
+          )}
+        </div>
+      )}
+
+      {/* Legend */}
+      {clusters.length > 0 && (
+        <div style={{ marginTop: 10, display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-faint)' }}>
+          {clusters.map((c, i) => (
+            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: colors[i % colors.length], display: 'inline-block' }} />
+              {c.name}
+            </span>
+          ))}
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3a4555', display: 'inline-block' }} />
+            Unclustered
+          </span>
+        </div>
+      )}
+    </div>
+  )
 }

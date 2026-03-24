@@ -55,23 +55,33 @@ For key_citations_to_follow provide REAL papers as "Author et al., Title (Year)"
 
 // Generate an SVG schematic of the paper's method
 export async function genSchematic(key, p) {
-  const svgText = await callAI(key, `You are a scientific diagram creator. Given this paper, create a SIMPLE SVG diagram showing the key method/architecture/pipeline.
+  const svgText = await callAI(key, `You are an expert scientific diagram designer. Create a CLEAN, PROFESSIONAL SVG pipeline/architecture diagram for this paper.
 
 Title: ${p.title}
 Abstract: ${p.abstract || 'N/A'}
 Methods: ${p.summary?.methods?.join(', ') || 'N/A'}
 Key contributions: ${p.summary?.key_contributions?.join(', ') || 'N/A'}
 
-Rules:
-- Return ONLY the SVG code, nothing else. No markdown, no backticks.
-- Use viewBox="0 0 600 300"
-- Use dark theme: background #111822, text #d4d4d4, boxes #1a2535 with border #2a4a39
-- Use colors: green #5b8a72, blue #7eb8da, purple #9070c4, orange #c49070 for different components
-- Include labeled boxes connected by arrows showing the data/method flow
-- Keep it simple: 3-7 boxes maximum
-- Use rounded rectangles (rx=6) for boxes
-- Use readable font: font-family="monospace" font-size="11"
-- Start with <svg and end with </svg>`, 2000)
+STRICT RULES - follow exactly:
+1. Return ONLY raw SVG code. No markdown, no backticks, no explanation.
+2. Start with <svg viewBox="0 0 700 350" xmlns="http://www.w3.org/2000/svg"> and end with </svg>
+3. LAYOUT: Use a clear LEFT-TO-RIGHT flow with 3-6 main stages. Space boxes evenly.
+4. BOXES: Use <rect> with rx="8" ry="8", width 100-130, height 50-65.
+5. COLORS for boxes (use different ones for different stages):
+   - Input/Data: fill="#1a3329" stroke="#5b8a72" (green)
+   - Processing/Model: fill="#1a2535" stroke="#7eb8da" (blue)  
+   - Key Method: fill="#251a35" stroke="#9070c4" (purple)
+   - Output/Result: fill="#2e2a1a" stroke="#d1c490" (gold)
+   - Loss/Training: fill="#2e1a1a" stroke="#d19090" (red)
+6. TEXT: Use fill="#e8e8e8" font-family="Arial,sans-serif". 
+   - Stage labels: font-size="12" font-weight="bold" centered in boxes
+   - Sub-labels below: font-size="9" fill="#8a9bb5"
+7. ARROWS: Use <line> or <path> with stroke="#4a5a6a" stroke-width="2" and marker-end with a proper arrowhead. Define arrowhead in <defs>.
+8. Add a title at top: font-size="14" fill="#e8e8e8" font-weight="bold"
+9. BACKGROUND: Add <rect width="700" height="350" fill="#0e1318" rx="8"/>
+10. Make it look like a real conference paper figure - clean, professional, readable.
+11. Vertically center the pipeline boxes around y=160.
+12. Add thin connector labels on arrows if relevant (font-size="8" fill="#6a7b8f").`, 3000)
   return svgText.trim()
 }
 
