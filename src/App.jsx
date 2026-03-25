@@ -30,6 +30,8 @@ export default function App() {
   const [showSet, setShowSet] = useState(false)
   const [zotL, setZotL] = useState(false)
   const [zotMsg, setZotMsg] = useState('')
+  const [weeklyRecs, setWeeklyRecs] = useState(() => ld('rh_weekly', null))
+  const [weeklyL, setWeeklyL] = useState(false)
 
   // Debounced save — prevents lag during batch summarization
   const saveTimer = useRef(null)
@@ -156,6 +158,48 @@ export default function App() {
     finally { setGapL(false) }
   }
 
+  async function genWeekly() {
+    if (!apiKey) { setError('API key required.'); return }
+    if (papers.length < 3) { setError('Need 3+ papers for reading suggestions.'); return }
+    setWeeklyL(true); setError(null)
+    try {
+      const readRecently = papers.filter(p => p.readStatus === 'read').slice(0, 5)
+      const unread = papers.filter(p => p.readStatus !== 'read')
+      const allTagsList = [...new Set(papers.flatMap(p => p.summary?.tags || []))]
+
+      const prompt = `You are a PhD research reading advisor. Based on this researcher's library, suggest a focused weekly reading plan.
+
+RECENTLY READ (${readRecently.length}):
+${readRecently.map(p => '- "' + p.title + '" [Tags: ' + (p.summary?.tags || []).join(', ') + ']').join('\n')}
+
+UNREAD IN LIBRARY (${unread.length}):
+${unread.slice(0, 20).map(p => '- "' + p.title + '" [Tags: ' + (p.summary?.tags || []).join(', ') + '] TLDR: ' + (p.summary?.tldr || p.abstract?.slice(0, 80) || 'N/A')).join('\n')}
+
+ALL TAGS: ${allTagsList.join(', ')}
+
+Return ONLY valid JSON:
+{
+  "from_library": [{"title":"exact paper title from unread list","reason":"why read this now, max 15 words","priority":"high/medium"}],
+  "new_suggestions": [{"search_query":"specific search query for Semantic Scholar or PubMed","topic":"what gap this fills","reason":"why this matters for the researcher"}],
+  "theme_of_the_week":"A 1-sentence theme to focus reading around",
+  "reading_order_tip":"Brief advice on what order to read them in"
+}
+
+Rules:
+- Pick 3-5 papers from the UNREAD list that form a coherent reading arc
+- Suggest 2-3 new paper search queries for papers NOT in their library
+- Base suggestions on what they've recently read and obvious gaps
+- Priority "high" = foundational/prerequisite, "medium" = deepening understanding`
+
+      const txt = await callAI(apiKey, prompt, 1500)
+      const parsed = JSON.parse(txt)
+      parsed.generatedAt = new Date().toISOString()
+      setWeeklyRecs(parsed)
+      sv('rh_weekly', parsed)
+    } catch (err) { setError('Weekly suggestions failed: ' + err.message) }
+    finally { setWeeklyL(false) }
+  }
+
   function del(id) { setPapers(p => p.filter(x => x.id !== id)); if (selected?.id === id) { setSelected(null); setTab('library') } }
   function togRead(id) { setPapers(p => p.map(x => x.id === id ? { ...x, readStatus: x.readStatus === 'read' ? 'unread' : 'read' } : x)) }
   function togStar(id) { setPapers(p => p.map(x => x.id === id ? { ...x, starred: !x.starred } : x)); if (selected?.id === id) setSelected(p => ({ ...p, starred: !p.starred })) }
@@ -224,5 +268,5 @@ export default function App() {
     return (<div>{headerEl}<GapView papers={papers} gap={gap} gapL={gapL} onRunGap={runGap} />{settingsEl}</div>)
   }
 
-  return (<div>{headerEl}<LibraryView papers={papers} filtered={filtered} allTags={allTags} filterTags={filterTags} setFilterTags={setFilterTags} readFilter={readFilter} setReadFilter={setReadFilter} search={search} setSearch={setSearch} unsum={unsum} sumL={sumL} loadingMsg={loadingMsg} onSumAll={sumAll} onSelect={p => { setSelected(p); setTab('detail') }} onToggleStar={togStar} showStarred={showStarred} setShowStarred={setShowStarred} />{settingsEl}</div>)
+  return (<div>{headerEl}<LibraryView papers={papers} filtered={filtered} allTags={allTags} filterTags={filterTags} setFilterTags={setFilterTags} readFilter={readFilter} setReadFilter={setReadFilter} search={search} setSearch={setSearch} unsum={unsum} sumL={sumL} loadingMsg={loadingMsg} onSumAll={sumAll} onSelect={p => { setSelected(p); setTab('detail') }} onToggleStar={togStar} showStarred={showStarred} setShowStarred={setShowStarred} weeklyRecs={weeklyRecs} weeklyL={weeklyL} onGenWeekly={genWeekly} />{settingsEl}</div>)
 }
